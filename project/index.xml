@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Projects on Svetha Venkatesh</title>
+    <link>https://svethav.github.io/project/</link>
+    <description>Recent content in Projects on Svetha Venkatesh</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <copyright>&amp;copy; 2017 svetha venkatesh</copyright>
+    <lastBuildDate>Wed, 27 Apr 2016 00:00:00 +0000</lastBuildDate>
+    <atom:link href="/project/" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>Early Intervention for Autism</title>
+      <link>https://svethav.github.io/project/early-intervention-for-autism/</link>
+      <pubDate>Wed, 27 Apr 2016 00:00:00 +0000</pubDate>
+      
+      <guid>https://svethav.github.io/project/early-intervention-for-autism/</guid>
+      <description>&lt;p&gt;There is a growing gap between the number of children with autism requiring early intervention and available therapy. In this project we seek to produce the following outcomes:
+* Flexible frameworks for stimulus presentation and recording, for early intervention in social and cognitive/visual areas,
+* Open source infrastructures to leverage content and metadata from social media, constructing foundations for reusable content in early intervention,
+* Assistive Technologies for finding appropriate information from forums and blogs, focusing on autism,
+* Early warning systems of mental wellbeing, measuring affect in text-based social media (forums, blogs, etc.) and appropriate triggers for social support.
+* New tools for assistive support for communication and social function.&lt;/p&gt;
+
+&lt;p&gt;Our partners are: &lt;a href=&#34;http://www.autismwest.org.au/&#34; target=&#34;_blank&#34;&gt;Autism West&lt;/a&gt;, &lt;a href=&#34;http://www.gateways.com.au/&#34; target=&#34;_blank&#34;&gt;Gateways&lt;/a&gt;, &lt;a href=&#34;http://www.barwonhealth.org.au/&#34; target=&#34;_blank&#34;&gt;Barwon health&lt;/a&gt;. We do this project jointly with our colleagues at Curtin University.&lt;/p&gt;
+
+&lt;p&gt;Our Contributions: We present a portable platform for pervasive delivery of early intervention therapy using multi-touch interfaces and principled ways to deliver stimuli of increasing complexity and adapt to a child&amp;rsquo;s performance. Our implementation weaves Natural Environment Tasks with iPad tasks, facilitating a learning platform that integrates early intervention in the child&amp;rsquo;s daily life. The system&amp;rsquo;s construction of stimulus complexity relative to task is evaluated by therapists, together with field trials for evaluating both the integrity of the instructional design and goal of stimulus presentation and adjustment relative to performance for learning tasks. We show overwhelmingly positive results across all our stakeholders, children, parents and therapists. Our results have implications for other early learning fields that require principled ways to construct lessons across skills and adjust stimuli relative to performance. See &lt;a href=&#34;http://tobyplaypad.com/&#34; target=&#34;_blank&#34;&gt;Toby Playpad&lt;/a&gt;. The Technology won the 2011 Curtin University Commercialization award.&lt;/p&gt;
+
+
+&lt;div style=&#34;position: relative; padding-bottom: 56.25%; padding-top: 30px; height: 0; overflow: hidden;&#34;&gt;
+  &lt;iframe src=&#34;//www.youtube.com/embed/OGmwE67RnTc&#34; style=&#34;position: absolute; top: 0; left: 0; width: 100%; height: 100%;&#34; allowfullscreen frameborder=&#34;0&#34; title=&#34;YouTube Video&#34;&gt;&lt;/iframe&gt;
+ &lt;/div&gt;
+
+
+
+&lt;div style=&#34;position: relative; padding-bottom: 56.25%; padding-top: 30px; height: 0; overflow: hidden;&#34;&gt;
+  &lt;iframe src=&#34;//www.youtube.com/embed/xubqQ74aPyI&#34; style=&#34;position: absolute; top: 0; left: 0; width: 100%; height: 100%;&#34; allowfullscreen frameborder=&#34;0&#34; title=&#34;YouTube Video&#34;&gt;&lt;/iframe&gt;
+ &lt;/div&gt;
+
+</description>
+    </item>
+    
+    <item>
+      <title>Health Analytics</title>
+      <link>https://svethav.github.io/project/health-analytics/</link>
+      <pubDate>Wed, 27 Apr 2016 00:00:00 +0000</pubDate>
+      
+      <guid>https://svethav.github.io/project/health-analytics/</guid>
+      <description>&lt;p&gt;With our partner &lt;a href=&#34;http://www.barwonhealth.org.au/&#34; target=&#34;_blank&#34;&gt;Barwon Health&lt;/a&gt; we are embarking on questions that arise in examination of large, disparate and multimodal hospital data sets. Can we impact and inform the formation of dynamic health intervention and improved safety and care through:&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;Predicting hospital visitation patterns of patients with chronic disease,&lt;/li&gt;
+&lt;li&gt;Detection of sub-populations that have coherent patterns of disease, causal factors, and typical medical responses&lt;/li&gt;
+&lt;li&gt;Identify data driven characteristics of chronic patients to enable personalized care plans&lt;/li&gt;
+&lt;li&gt;Detect indicators that serve as early warning of chronic disease&lt;/li&gt;
+&lt;li&gt;Monitor key factors that deliver value to patients in the areas of care experiences, care coordination and patient safety.&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;Our work led to the formation of a tech company &lt;a href=&#34;http://ihosp.com/&#34; target=&#34;_blank&#34;&gt;iHosp&lt;/a&gt;, an app that allows hospital administrators and clinicians to see at a glance what’s happening in the hospital, on the ward or to their patients. This was developed over several years of research, using machine learning to mine medical and hospital data to provide hospital cost efficiencies and better predictive patient support.&lt;/p&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>Large Scale Surveillance</title>
+      <link>https://svethav.github.io/project/large-scale-surveillance/</link>
+      <pubDate>Wed, 27 Apr 2016 00:00:00 +0000</pubDate>
+      
+      <guid>https://svethav.github.io/project/large-scale-surveillance/</guid>
+      <description>&lt;p&gt;We are interested in the problems that arise when we examine hundreds of cameras. This big data problem opens up many new questions: Given limited operator capacity, how can select which camera I should look at? How do I select models and parameters for heterogeneous stream data - example, video feeds in varying environmental conditions? How do I evaluate algorithms in big data - training sets may exceeds 2 weeks of video data, and no realistic ground truth can be obtained from operators. How do we compare algorithms?&lt;/p&gt;
+
+&lt;p&gt;Our Contributions: Focusing on issues of large scale surveillance we have developed new techniques to model &amp;ldquo;normal&amp;rdquo; data from static video cameras. This allows us to detect real time &amp;ldquo;abnormal events&amp;rdquo; and thus enable operators to focus on the 1% of events in a video feed. Our algorithms drive the start-up iCetana&amp;rsquo;s innovative anomaly detection software. The software uses ideas from Compressed Sensing to enable simultaneous surveillance of many cameras deployed in diverse settings. A local city council has used our algorithms to detect loitering, anti-social behaviour and traffic violations. For more information see &lt;a href=&#34;https://icetana.com/&#34; target=&#34;_blank&#34;&gt;iCetana&lt;/a&gt;. The technology was: Winner, The Broadband Innovation Award Tech23,2010; Winner, 2011 WA Innovator of the Year.&lt;/p&gt;
+
+
+&lt;div style=&#34;position: relative; padding-bottom: 56.25%; padding-top: 30px; height: 0; overflow: hidden;&#34;&gt;
+  &lt;iframe src=&#34;//www.youtube.com/embed/kYJvDA4gDKY&#34; style=&#34;position: absolute; top: 0; left: 0; width: 100%; height: 100%;&#34; allowfullscreen frameborder=&#34;0&#34; title=&#34;YouTube Video&#34;&gt;&lt;/iframe&gt;
+ &lt;/div&gt;
+
+
+
+&lt;div style=&#34;position: relative; padding-bottom: 56.25%; padding-top: 30px; height: 0; overflow: hidden;&#34;&gt;
+  &lt;iframe src=&#34;//www.youtube.com/embed/ZJzIGUfZN1M&#34; style=&#34;position: absolute; top: 0; left: 0; width: 100%; height: 100%;&#34; allowfullscreen frameborder=&#34;0&#34; title=&#34;YouTube Video&#34;&gt;&lt;/iframe&gt;
+ &lt;/div&gt;
+
+</description>
+    </item>
+    
+    <item>
+      <title>Social Media Analysis</title>
+      <link>https://svethav.github.io/project/social-media-analysis/</link>
+      <pubDate>Wed, 27 Apr 2016 00:00:00 +0000</pubDate>
+      
+      <guid>https://svethav.github.io/project/social-media-analysis/</guid>
+      <description>&lt;p&gt;We study patterns in social media data; who is talking to who? What are they talking about? What is their sentiment? We discover latent community structures, their topics and trends. We explore not only text in blogs but also connectivity through comments. For personal media management it could be argued that social context contains the set of conceptions most often brought to bear on their contents: Where was this? Who is that? What activity were we all doing there? Who do I want to share this with? This project aims to use signals obtained from unobtrusive data sources available with today&amp;rsquo;s devices, such as location information (e.g. GPS), to extract socially meaningful indices for personal media. Social spheres are locations of significance, such as Home, Work and Recreational Area. Social networks of social ties capture the dynamic web of relationships in which we are embedded. Social rhythms arise as patterns across these former elements and allow even finer resolution categorization of activities that occur within them in space and time. All of this information can then be used, at the very least, to provide new ways to index and interact with our own, or others&amp;rsquo;, media collections. Initial work in this area focused on discovering the social spheres Work, Home and Other from raw, noisy GPS traces of everyday life, and used this information together with the presence of known persons to provide a novel personal media exploration environment called Socio-Graph. The interface aimed to allow simple search and filtering on the concepts most people innately bring to their personal media. We do this project jointly with our colleagues at Curtin University.&lt;/p&gt;
+</description>
+    </item>
+    
+  </channel>
+</rss>

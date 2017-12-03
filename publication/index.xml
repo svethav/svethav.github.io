@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Publications on Svetha Venkatesh</title>
+    <link>https://svethav.github.io/publication/</link>
+    <description>Recent content in Publications on Svetha Venkatesh</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <copyright>&amp;copy; 2017 svetha venkatesh</copyright>
+    <lastBuildDate>Sun, 01 Jan 2017 00:00:00 +0000</lastBuildDate>
+    <atom:link href="/publication/" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>Bayesian nonparametric multilevel clustering with group-level contexts</title>
+      <link>https://svethav.github.io/publication/bayesian-nonparametric/</link>
+      <pubDate>Tue, 01 Jul 2014 00:00:00 +0000</pubDate>
+      
+      <guid>https://svethav.github.io/publication/bayesian-nonparametric/</guid>
+      <description></description>
+    </item>
+    
+    <item>
+      <title>Risk stratification using data from electronic medical records better predicts suicide risks than clinician assessments </title>
+      <link>https://svethav.github.io/publication/risk-stratification/</link>
+      <pubDate>Tue, 01 Jul 2014 00:00:00 +0000</pubDate>
+      
+      <guid>https://svethav.github.io/publication/risk-stratification/</guid>
+      <description></description>
+    </item>
+    
+    <item>
+      <title>TOBY: Early intervention in autism through technology </title>
+      <link>https://svethav.github.io/publication/toby/</link>
+      <pubDate>Mon, 01 Jul 2013 00:00:00 +0000</pubDate>
+      
+      <guid>https://svethav.github.io/publication/toby/</guid>
+      <description></description>
+    </item>
+    
+    <item>
+      <title>Nonnegative shared subspace learning and its application to social media retrieval </title>
+      <link>https://svethav.github.io/publication/nonnegative-shared/</link>
+      <pubDate>Thu, 01 Jul 2010 00:00:00 +0000</pubDate>
+      
+      <guid>https://svethav.github.io/publication/nonnegative-shared/</guid>
+      <description></description>
+    </item>
+    
+    <item>
+      <title>Video abstraction: A systematic review and classification </title>
+      <link>https://svethav.github.io/publication/video-abstraction/</link>
+      <pubDate>Sun, 01 Jul 2007 00:00:00 +0000</pubDate>
+      
+      <guid>https://svethav.github.io/publication/video-abstraction/</guid>
+      <description></description>
+    </item>
+    
+    <item>
+      <title>Virtual observers in a mobile surveillance system</title>
+      <link>https://svethav.github.io/publication/virtual-observers/</link>
+      <pubDate>Sat, 01 Jul 2006 00:00:00 +0000</pubDate>
+      
+      <guid>https://svethav.github.io/publication/virtual-observers/</guid>
+      <description></description>
+    </item>
+    
+    <item>
+      <title>Activity recognition and abnormality detection with the switching hidden semi-markov model  </title>
+      <link>https://svethav.github.io/publication/activity-recognition/</link>
+      <pubDate>Fri, 01 Jul 2005 00:00:00 +0000</pubDate>
+      
+      <guid>https://svethav.github.io/publication/activity-recognition/</guid>
+      <description></description>
+    </item>
+    
+    <item>
+      <title>Hierarchical hidden Markov models with general state hierarchy</title>
+      <link>https://svethav.github.io/publication/hierarchical-hidden/</link>
+      <pubDate>Thu, 01 Jul 2004 00:00:00 +0000</pubDate>
+      
+      <guid>https://svethav.github.io/publication/hierarchical-hidden/</guid>
+      <description></description>
+    </item>
+    
+    <item>
+      <title>Policy recognition in the abstract hidden markov model </title>
+      <link>https://svethav.github.io/publication/policy-recognition/</link>
+      <pubDate>Mon, 01 Jul 2002 00:00:00 +0000</pubDate>
+      
+      <guid>https://svethav.github.io/publication/policy-recognition/</guid>
+      <description></description>
+    </item>
+    
+    <item>
+      <title>Towards automatic extraction of expressive elements from motion pictures: Tempo </title>
+      <link>https://svethav.github.io/publication/towards-automatic/</link>
+      <pubDate>Sat, 01 Jun 2002 00:00:00 +0000</pubDate>
+      
+      <guid>https://svethav.github.io/publication/towards-automatic/</guid>
+      <description></description>
+    </item>
+    
+  </channel>
+</rss>
