@@ -1,0 +1,861 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<title>JabRef references</title>
+<meta http-equiv="Content-Type" content="text/html; charset=windows-1252">
+<script type="text/javascript">
+<!--
+// QuickSearch script for JabRef HTML export 
+// Version: 3.0
+//
+// Copyright (c) 2006-2011, Mark Schenk
+//
+// This software is distributed under a Creative Commons Attribution 3.0 License
+// http://creativecommons.org/licenses/by/3.0/
+//
+// Features:
+// - intuitive find-as-you-type searching
+//    ~ case insensitive
+//    ~ ignore diacritics (optional)
+//
+// - search with/without Regular Expressions
+// - match BibTeX key
+//
+
+// Search settings
+var searchAbstract = true;	// search in abstract
+var searchReview = true;	// search in review
+
+var noSquiggles = true; 	// ignore diacritics when searching
+var searchRegExp = false; 	// enable RegExp searches
+
+
+if (window.addEventListener) {
+	window.addEventListener("load",initSearch,false); }
+else if (window.attachEvent) {
+	window.attachEvent("onload", initSearch); }
+
+function initSearch() {
+	// check for quick search table and searchfield
+	if (!document.getElementById('qs_table')||!document.getElementById('quicksearch')) { return; }
+
+	// load all the rows and sort into arrays
+	loadTableData();
+	
+	//find the query field
+	qsfield = document.getElementById('qs_field');
+
+	// previous search term; used for speed optimisation
+	prevSearch = '';
+
+	//find statistics location
+	stats = document.getElementById('stat');
+	setStatistics(-1);
+	
+	// set up preferences
+	initPreferences();
+
+	// shows the searchfield
+	document.getElementById('quicksearch').style.display = 'block';
+	document.getElementById('qs_field').onkeyup = quickSearch;
+}
+
+function loadTableData() {
+	// find table and appropriate rows
+	searchTable = document.getElementById('qs_table');
+	var allRows = searchTable.getElementsByTagName('tbody')[0].getElementsByTagName('tr');
+
+	// split all rows into entryRows and infoRows (e.g. abstract, review, bibtex)
+	entryRows = new Array(); infoRows = new Array(); absRows = new Array(); revRows = new Array();
+
+	// get data from each row
+	entryRowsData = new Array(); absRowsData = new Array(); revRowsData = new Array(); 
+	
+	BibTeXKeys = new Array();
+	
+	for (var i=0, k=0, j=0; i<allRows.length;i++) {
+		if (allRows[i].className.match(/entry/)) {
+			entryRows[j] = allRows[i];
+			entryRowsData[j] = stripDiacritics(getTextContent(allRows[i]));
+			allRows[i].id ? BibTeXKeys[j] = allRows[i].id : allRows[i].id = 'autokey_'+j;
+			j ++;
+		} else {
+			infoRows[k++] = allRows[i];
+			// check for abstract/review
+			if (allRows[i].className.match(/abstract/)) {
+				absRows.push(allRows[i]);
+				absRowsData[j-1] = stripDiacritics(getTextContent(allRows[i]));
+			} else if (allRows[i].className.match(/review/)) {
+				revRows.push(allRows[i]);
+				revRowsData[j-1] = stripDiacritics(getTextContent(allRows[i]));
+			}
+		}
+	}
+	//number of entries and rows
+	numEntries = entryRows.length;
+	numInfo = infoRows.length;
+	numAbs = absRows.length;
+	numRev = revRows.length;
+}
+
+function quickSearch(){
+	
+	tInput = qsfield;
+
+	if (tInput.value.length == 0) {
+		showAll();
+		setStatistics(-1);
+		qsfield.className = '';
+		return;
+	} else {
+		t = stripDiacritics(tInput.value);
+
+		if(!searchRegExp) { t = escapeRegExp(t); }
+			
+		// only search for valid RegExp
+		try {
+			textRegExp = new RegExp(t,"i");
+			closeAllInfo();
+			qsfield.className = '';
+		}
+			catch(err) {
+			prevSearch = tInput.value;
+			qsfield.className = 'invalidsearch';
+			return;
+		}
+	}
+	
+	// count number of hits
+	var hits = 0;
+
+	// start looping through all entry rows
+	for (var i = 0; cRow = entryRows[i]; i++){
+
+		// only show search the cells if it isn't already hidden OR if the search term is getting shorter, then search all
+		if(cRow.className.indexOf('noshow')==-1 || tInput.value.length <= prevSearch.length){
+			var found = false; 
+
+			if (entryRowsData[i].search(textRegExp) != -1 || BibTeXKeys[i].search(textRegExp) != -1){ 
+				found = true;
+			} else {
+				if(searchAbstract && absRowsData[i]!=undefined) {
+					if (absRowsData[i].search(textRegExp) != -1){ found=true; } 
+				}
+				if(searchReview && revRowsData[i]!=undefined) {
+					if (revRowsData[i].search(textRegExp) != -1){ found=true; } 
+				}
+			}
+			
+			if (found){
+				cRow.className = 'entry show';
+				hits++;
+			} else {
+				cRow.className = 'entry noshow';
+			}
+		}
+	}
+
+	// update statistics
+	setStatistics(hits)
+	
+	// set previous search value
+	prevSearch = tInput.value;
+}
+
+
+// Strip Diacritics from text
+// http://stackoverflow.com/questions/990904/javascript-remove-accents-in-strings
+
+// String containing replacement characters for stripping accents 
+var stripstring = 
+    'AAAAAAACEEEEIIII'+
+    'DNOOOOO.OUUUUY..'+
+    'aaaaaaaceeeeiiii'+
+    'dnooooo.ouuuuy.y'+
+    'AaAaAaCcCcCcCcDd'+
+    'DdEeEeEeEeEeGgGg'+
+    'GgGgHhHhIiIiIiIi'+
+    'IiIiJjKkkLlLlLlL'+
+    'lJlNnNnNnnNnOoOo'+
+    'OoOoRrRrRrSsSsSs'+
+    'SsTtTtTtUuUuUuUu'+
+    'UuUuWwYyYZzZzZz.';
+
+function stripDiacritics(str){
+
+    if(noSquiggles==false){
+        return str;
+    }
+
+    var answer='';
+    for(var i=0;i<str.length;i++){
+        var ch=str[i];
+        var chindex=ch.charCodeAt(0)-192;   // Index of character code in the strip string
+        if(chindex>=0 && chindex<stripstring.length){
+            // Character is within our table, so we can strip the accent...
+            var outch=stripstring.charAt(chindex);
+            // ...unless it was shown as a '.'
+            if(outch!='.')ch=outch;
+        }
+        answer+=ch;
+    }
+    return answer;
+}
+
+// http://stackoverflow.com/questions/3446170/escape-string-for-use-in-javascript-regex
+// NOTE: must escape every \ in the export code because of the JabRef Export...
+function escapeRegExp(str) {
+  return str.replace(/[-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, "\\$&");
+}
+
+function toggleInfo(articleid,info) {
+
+	var entry = document.getElementById(articleid);
+	var abs = document.getElementById('abs_'+articleid);
+	var rev = document.getElementById('rev_'+articleid);
+	var bib = document.getElementById('bib_'+articleid);
+	
+	if (abs && info == 'abstract') {
+		abs.className.indexOf('noshow') == -1?abs.className = 'abstract noshow':abs.className = 'abstract show';
+	} else if (rev && info == 'review') {
+		rev.className.indexOf('noshow') == -1?rev.className = 'review noshow':rev.className = 'review show';
+	} else if (bib && info == 'bibtex') {
+		bib.className.indexOf('noshow') == -1?bib.className = 'bibtex noshow':bib.className = 'bibtex show';
+	} else { 
+		return;
+	}
+
+	// check if one or the other is available
+	var revshow; var absshow; var bibshow;
+	(abs && abs.className.indexOf('noshow') == -1)? absshow = true: absshow = false;
+	(rev && rev.className.indexOf('noshow') == -1)? revshow = true: revshow = false;	
+	(bib && bib.className.indexOf('noshow') == -1)? bibshow = true: bibshow = false;
+	
+	// highlight original entry
+	if(entry) {
+		if (revshow || absshow || bibshow) {
+		entry.className = 'entry highlight show';
+		} else {
+		entry.className = 'entry show';
+		}
+	}
+	
+	// When there's a combination of abstract/review/bibtex showing, need to add class for correct styling
+	if(absshow) {
+		(revshow||bibshow)?abs.className = 'abstract nextshow':abs.className = 'abstract';
+	} 
+	if (revshow) {
+		bibshow?rev.className = 'review nextshow': rev.className = 'review';
+	}	
+	
+}
+
+function setStatistics (hits) {
+	if(hits < 0) { hits=numEntries; }
+	if(stats) { stats.firstChild.data = hits + '/' + numEntries}
+}
+
+function getTextContent(node) {
+	// Function written by Arve Bersvendsen
+	// http://www.virtuelvis.com
+	
+	if (node.nodeType == 3) {
+	return node.nodeValue;
+	} // text node
+	if (node.nodeType == 1 && node.className != "infolinks") { // element node
+	var text = [];
+	for (var chld = node.firstChild;chld;chld=chld.nextSibling) {
+		text.push(getTextContent(chld));
+	}
+	return text.join("");
+	} return ""; // some other node, won't contain text nodes.
+}
+
+function showAll(){
+	closeAllInfo();
+	for (var i = 0; i < numEntries; i++){ entryRows[i].className = 'entry show'; }
+}
+
+function closeAllInfo(){
+	for (var i=0; i < numInfo; i++){
+		if (infoRows[i].className.indexOf('noshow') ==-1) {
+			infoRows[i].className = infoRows[i].className + ' noshow';
+		}
+	}
+}
+
+function clearQS() {
+	qsfield.value = '';
+	showAll();
+}
+
+function redoQS(){
+	showAll();
+	quickSearch(qsfield);
+}
+
+function updateSetting(obj){
+	var option = obj.id;
+	var checked = obj.value;
+
+	switch(option)
+	 {
+	 case "opt_searchAbs":
+	   searchAbstract=!searchAbstract;
+	   redoQS();
+	   break;
+	 case "opt_searchRev":
+	   searchReview=!searchReview;
+	   redoQS();
+	   break;
+	 case "opt_useRegExp":
+	   searchRegExp=!searchRegExp;
+	   redoQS();
+	   break;
+	 case "opt_noAccents":
+	   noSquiggles=!noSquiggles;
+	   loadTableData();
+	   redoQS();
+	   break;
+	 }
+}
+
+function initPreferences(){
+	if(searchAbstract){document.getElementById("opt_searchAbs").checked = true;}
+	if(searchReview){document.getElementById("opt_searchRev").checked = true;}
+	if(noSquiggles){document.getElementById("opt_noAccents").checked = true;}
+	if(searchRegExp){document.getElementById("opt_useRegExp").checked = true;}
+	
+	if(numAbs==0) {document.getElementById("opt_searchAbs").parentNode.style.display = 'none';}
+	if(numRev==0) {document.getElementById("opt_searchRev").parentNode.style.display = 'none';}	
+}
+
+function toggleSettings(){
+	var togglebutton = document.getElementById('showsettings');
+	var settings = document.getElementById('settings');
+	
+	if(settings.className == "hidden"){
+		settings.className = "show";
+		togglebutton.innerText = "close settings";
+		togglebutton.textContent = "close settings";
+	}else{
+		settings.className = "hidden";
+		togglebutton.innerText = "settings...";		
+		togglebutton.textContent = "settings...";
+	}
+}
+
+-->
+</script>
+<style type="text/css">
+body { background-color: white; font-family: Arial, sans-serif; font-size: 13px; line-height: 1.2; padding: 1em; color: #2E2E2E; width: 50em; margin: auto auto; }
+
+form#quicksearch { width: auto; border-style: solid; border-color: gray; border-width: 1px 0px; padding: 0.7em 0.5em; display:none; position:relative; }
+span#searchstat {padding-left: 1em;}
+
+div#settings { margin-top:0.7em; /* border-bottom: 1px transparent solid; background-color: #efefef; border: 1px grey solid; */ }
+div#settings ul {margin: 0; padding: 0; }
+div#settings li {margin: 0; padding: 0 1em 0 0; display: inline; list-style: none; }
+div#settings li + li { border-left: 2px #efefef solid; padding-left: 0.5em;}
+div#settings input { margin-bottom: 0px;}
+
+div#settings.hidden {display:none;}
+
+#showsettings { border: 1px grey solid; padding: 0 0.5em; float:right; line-height: 1.6em; text-align: right; }
+#showsettings:hover { cursor: pointer; }
+
+.invalidsearch { background-color: red; }
+input[type="button"] { background-color: #efefef; border: 1px #2E2E2E solid;}
+
+table { border: 1px gray none; width: 100%; empty-cells: show; border-spacing: 0em 0.1em; margin: 1em 0em; }
+th, td { border: none; padding: 0.5em; vertical-align: top; text-align: justify; }
+
+td a { color: navy; text-decoration: none; }
+td a:hover  { text-decoration: underline; }
+
+tr.noshow { display: none;}
+tr.highlight td { background-color: #EFEFEF; border-top: 2px #2E2E2E solid; font-weight: bold; }
+tr.abstract td, tr.review td, tr.bibtex td { background-color: #EFEFEF; text-align: justify; border-bottom: 2px #2E2E2E solid; }
+tr.nextshow td { border-bottom-style: none; }
+
+tr.bibtex pre { width: 100%; overflow: auto; white-space: pre-wrap;}
+p.infolinks { margin: 0.3em 0em 0em 0em; padding: 0px; }
+
+@media print {
+	p.infolinks, #qs_settings, #quicksearch, t.bibtex { display: none !important; }
+	tr { page-break-inside: avoid; }
+}
+</style>
+</head>
+<body>
+
+<form action="" id="quicksearch">
+<input type="text" id="qs_field" autocomplete="off" placeholder="Type to search..." /> <input type="button" onclick="clearQS()" value="clear" />
+<span id="searchstat">Matching entries: <span id="stat">0</span></span>
+<div id="showsettings" onclick="toggleSettings()">settings...</div>
+<div id="settings" class="hidden">
+<ul>
+<li><input type="checkbox" class="search_setting" id="opt_searchAbs" onchange="updateSetting(this)"><label for="opt_searchAbs"> include abstract</label></li>
+<li><input type="checkbox" class="search_setting" id="opt_searchRev" onchange="updateSetting(this)"><label for="opt_searchRev"> include review</label></li>
+<li><input type="checkbox" class="search_setting" id="opt_useRegExp" onchange="updateSetting(this)"><label for="opt_useRegExp"> use RegExp</label></li>
+<li><input type="checkbox" class="search_setting" id="opt_noAccents" onchange="updateSetting(this)"><label for="opt_noAccents"> ignore accents</label></li>
+</ul>
+</div>
+</form>
+<table id="qs_table" border="1">
+<tbody>
+<tr id="bui1999probabilistic" class="entry">
+	<td>Bui H, Venkatesh S and West G (1999), <i>"Probabilistic querying at multiple levels of abstraction in large spatial domains"</i>, In DICTA: Fifth International/National Biennial Conference on Digital Image Computing, Techniques and Applications. , pp. 285-290.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('bui1999probabilistic','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_bui1999probabilistic" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{bui1999probabilistic,
+  author = {Bui, HH and Venkatesh, Svetha and West, G},
+  title = {Probabilistic querying at multiple levels of abstraction in large spatial domains},
+  booktitle = {DICTA: Fifth International/National Biennial Conference on Digital Image Computing, Techniques and Applications},
+  year = {1999},
+  pages = {285--290}
+}
+</pre></td>
+</tr>
+<tr id="bui1999learning" class="entry">
+	<td>Bui HH, Venkatesh S and Kieronska D (1999), <i>"Learning other agents preferences in multi-agent negotiation using bayesian classifiers"</i>, International Journal of Cooperative Information Systems.  Vol. 8(04), pp. 275-293. World Scientific.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('bui1999learning','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_bui1999learning" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{bui1999learning,
+  author = {Bui, Hung Hai and Venkatesh, Svetha and Kieronska, D},
+  title = {Learning other agents preferences in multi-agent negotiation using bayesian classifiers},
+  journal = {International Journal of Cooperative Information Systems},
+  publisher = {World Scientific},
+  year = {1999},
+  volume = {8},
+  number = {04},
+  pages = {275--293}
+}
+</pre></td>
+</tr>
+<tr id="bui1999layered" class="entry">
+	<td>Bui HH, Venkatesh S and West G (1999), <i>"Layered dynamic probabilistic networks for spatio-temporal modelling"</i>, Intelligent Data Analysis.  Vol. 3(5), pp. 339-361. Elsevier.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('bui1999layered','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_bui1999layered" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{bui1999layered,
+  author = {Bui, Hung H and Venkatesh, Svetha and West, Geoff},
+  title = {Layered dynamic probabilistic networks for spatio-temporal modelling},
+  journal = {Intelligent Data Analysis},
+  publisher = {Elsevier},
+  year = {1999},
+  volume = {3},
+  number = {5},
+  pages = {339--361}
+}
+</pre></td>
+</tr>
+<tr id="campbell1999change" class="entry">
+	<td>Campbell S, Venkatesh S, Kumar M, Kraetzel M and Shoubridge P (1999), <i>"Change detection in dynamic communication networks"</i>, In DICTA: 5th International Biennial Conference on Digital Image Computing, Techniques and Applications. , pp. 94-98.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('campbell1999change','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_campbell1999change" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{campbell1999change,
+  author = {Campbell, S and Venkatesh, Svetha and Kumar, M and Kraetzel, M and Shoubridge, P},
+  title = {Change detection in dynamic communication networks},
+  booktitle = {DICTA: 5th International Biennial Conference on Digital Image Computing, Techniques and Applications},
+  year = {1999},
+  pages = {94--98}
+}
+</pre></td>
+</tr>
+<tr id="greenhill1999constructing" class="entry">
+	<td>Greenhill S and Venkatesh S (1999), <i>"Constructing and navigating personalised views of the Web"</i>, Information processing &amp; management.  Vol. 35(5), pp. 679-689. Elsevier.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('greenhill1999constructing','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_greenhill1999constructing" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{greenhill1999constructing,
+  author = {Greenhill, Stewart and Venkatesh, Svetha},
+  title = {Constructing and navigating personalised views of the Web},
+  journal = {Information processing &amp; management},
+  publisher = {Elsevier},
+  year = {1999},
+  volume = {35},
+  number = {5},
+  pages = {679--689}
+}
+</pre></td>
+</tr>
+<tr id="keith1999beyond" class="entry">
+	<td>Keith Magee R, Venkatesh S and Takatsuka M (1999), <i>"Beyond the topological map: developing alternate mappings in self organisation"</i>, In Fifth International Biennial Conference on Digital Image Computing, Techniques, and Applications. , pp. 88-93.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('keith1999beyond','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_keith1999beyond" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{keith1999beyond,
+  author = {Keith Magee, Russell and Venkatesh, Svetha and Takatsuka, Masahiro},
+  title = {Beyond the topological map: developing alternate mappings in self organisation},
+  booktitle = {Fifth International Biennial Conference on Digital Image Computing, Techniques, and Applications},
+  year = {1999},
+  pages = {88--93}
+}
+</pre></td>
+</tr>
+<tr id="keith1999empirical" class="entry">
+	<td>Keith-Magee R, Venkatesh S and Takatsuka M (1999), <i>"An empirical study of neighbourhood decay in Kohonen's self organising map"</i>, In International Joint Conference on Neural Networks.  Vol. 3, pp. 1953-1958.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('keith1999empirical','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_keith1999empirical" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{keith1999empirical,
+  author = {Keith-Magee, Russell and Venkatesh, Svetha and Takatsuka, Masahiro},
+  title = {An empirical study of neighbourhood decay in Kohonen's self organising map},
+  booktitle = {International Joint Conference on Neural Networks},
+  year = {1999},
+  volume = {3},
+  pages = {1953--1958}
+}
+</pre></td>
+</tr>
+<tr id="keith1999importance" class="entry">
+	<td>Keith-Magee R, Venkatesh S and Takatsuka M (1999), <i>"The importance of neighbourhood size in self organising systems"</i>, In 6th International Conference on Neural Information Processing.  Vol. 1, pp. 267-272.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('keith1999importance','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_keith1999importance" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{keith1999importance,
+  author = {Keith-Magee, Russell and Venkatesh, Svetha and Takatsuka, Masahiro},
+  title = {The importance of neighbourhood size in self organising systems},
+  booktitle = {6th International Conference on Neural Information Processing},
+  year = {1999},
+  volume = {1},
+  pages = {267--272}
+}
+</pre></td>
+</tr>
+<tr id="kumar1999information" class="entry">
+	<td>Kumar M, Venkatesh S, Lim K-Y and Santoso H (1999), <i>"Information access and QoS issues in a mobile computing environment"</i>, Journal of network and computer applications.  Vol. 22(2), pp. 91-118. Elsevier.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('kumar1999information','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_kumar1999information" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{kumar1999information,
+  author = {Kumar, M and Venkatesh, Svetha and Lim, K-Y and Santoso, H},
+  title = {Information access and QoS issues in a mobile computing environment},
+  journal = {Journal of network and computer applications},
+  publisher = {Elsevier},
+  year = {1999},
+  volume = {22},
+  number = {2},
+  pages = {91--118}
+}
+</pre></td>
+</tr>
+<tr id="lam1999obtaining" class="entry">
+	<td>Lam C, West G, Venkatesh S and Australia W (1999), <i>"Obtaining function models using active vision strategies"</i>, In 12th Conference on Vision Interface. , pp. 344-351.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('lam1999obtaining','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_lam1999obtaining" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{lam1999obtaining,
+  author = {Lam, CP and West, GAW and Venkatesh, Svetha and Australia, Western},
+  title = {Obtaining function models using active vision strategies},
+  booktitle = {12th Conference on Vision Interface},
+  year = {1999},
+  pages = {344--351}
+}
+</pre></td>
+</tr>
+<tr id="lazarescu1999incremental" class="entry">
+	<td>Lazarescu M, Venkatesh S and G W (1999), <i>"Incremental learning with forgetting"</i>, In Workshop on machine learning in computer vision, 16th International Conference on Machine Learning. 
+	<p class="infolinks"> [<a href="javascript:toggleInfo('lazarescu1999incremental','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_lazarescu1999incremental" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{lazarescu1999incremental,
+  author = {Lazarescu, M and Venkatesh, Svetha and West G},
+  title = {Incremental learning with forgetting},
+  booktitle = {Workshop on machine learning in computer vision, 16th International Conference on Machine Learning},
+  year = {1999}
+}
+</pre></td>
+</tr>
+<tr id="lazarescu1999classifying" class="entry">
+	<td>Lazarescu M, Venkatesh S and West G (1999), <i>"Classifying and learning cricket shots using camera motion"</i>, In Advanced topics in artificial intelligence: 12th Australian Joint Conference on Artificial Intelligence. , pp. 13-23.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('lazarescu1999classifying','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_lazarescu1999classifying" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{lazarescu1999classifying,
+  author = {Lazarescu, Mihai and Venkatesh, Svetha and West, Geoff},
+  title = {Classifying and learning cricket shots using camera motion},
+  booktitle = {Advanced topics in artificial intelligence: 12th Australian Joint Conference on Artificial Intelligence},
+  year = {1999},
+  pages = {13--23}
+}
+</pre></td>
+</tr>
+<tr id="lazarescu1999applications" class="entry">
+	<td>Lazarescu M, Venkatesh S, West G and Caelli T (1999), <i>"Applications of machine learning to dynamic scene analysis"</i>, In DICTA'99: 5th International Biennial Conference on Digital Image Computing, Techniques and Applications. , pp. 57-62.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('lazarescu1999applications','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_lazarescu1999applications" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{lazarescu1999applications,
+  author = {Lazarescu, M and Venkatesh, Svetha and West, G and Caelli, T},
+  title = {Applications of machine learning to dynamic scene analysis},
+  booktitle = {DICTA'99: 5th International Biennial Conference on Digital Image Computing, Techniques and Applications},
+  year = {1999},
+  pages = {57--62}
+}
+</pre></td>
+</tr>
+<tr id="lazarescu1999automated" class="entry">
+	<td>Lazarescu M, Venkatesh S, West G and Caelli T (1999), <i>"On the automated interpretation and indexing of American football"</i>, In IEEE International Conference on Multimedia Computing and Systems.  Vol. 1, pp. 802-806.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('lazarescu1999automated','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_lazarescu1999automated" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{lazarescu1999automated,
+  author = {Lazarescu, Mihai and Venkatesh, Svetha and West, Geoff and Caelli, Terry},
+  title = {On the automated interpretation and indexing of American football},
+  booktitle = {IEEE International Conference on Multimedia Computing and Systems},
+  year = {1999},
+  volume = {1},
+  pages = {802--806}
+}
+</pre></td>
+</tr>
+<tr id="lim1999determining" class="entry">
+	<td>Lim F, Lam C and Venkatesh S (1999), <i>"Determining Ohject Fuuction Based on its Motion"</i>, In International conference on Computational Intelligence for Modelling, Control and Automation. , pp. 54-59.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('lim1999determining','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_lim1999determining" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{lim1999determining,
+  author = {Lim, FL and Lam, CP and Venkatesh, Svetha},
+  title = {Determining Ohject Fuuction Based on its Motion},
+  booktitle = {International conference on Computational Intelligence for Modelling, Control and Automation},
+  year = {1999},
+  pages = {54-59}
+}
+</pre></td>
+</tr>
+<tr id="santoso1999adaptive" class="entry">
+	<td>Santoso H, Kumar M and Venkatesh S (1999), <i>"Adaptive mpeg filtering for mobile computing environment"</i>, In ASV: Fifth Asian Symposium on Visualisation. , pp. 182-488.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('santoso1999adaptive','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_santoso1999adaptive" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{santoso1999adaptive,
+  author = {Santoso, H and Kumar, M and Venkatesh, Svetha},
+  title = {Adaptive mpeg filtering for mobile computing environment},
+  booktitle = {ASV: Fifth Asian Symposium on Visualisation},
+  year = {1999},
+  pages = {182--488}
+}
+</pre></td>
+</tr>
+<tr id="shearer1999graph" class="entry">
+	<td>Shearer K, Bunke H and Venkatesh S (1999), <i>"Graph sequence matching by decision tree navigation"</i>, In 2nd IAPR-TC-15 Workshop on Graph-based Representations in Pattern Recognition. , pp. 99-108.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('shearer1999graph','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_shearer1999graph" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{shearer1999graph,
+  author = {Shearer, K and Bunke, H and Venkatesh, Svetha},
+  title = {Graph sequence matching by decision tree navigation},
+  booktitle = {2nd IAPR-TC-15 Workshop on Graph-based Representations in Pattern Recognition},
+  year = {1999},
+  pages = {99--108}
+}
+</pre></td>
+</tr>
+<tr id="shearer1999detection" class="entry">
+	<td>Shearer K and Venkatesh S (1999), <i>"Detection of setting and subject information in documentary video"</i>, In IEEE International Conference on Multimedia Computing and Systems.  Vol. 1, pp. 797-801.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('shearer1999detection','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_shearer1999detection" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{shearer1999detection,
+  author = {Shearer, Kim and Venkatesh, Svetha},
+  title = {Detection of setting and subject information in documentary video},
+  booktitle = {IEEE International Conference on Multimedia Computing and Systems},
+  year = {1999},
+  volume = {1},
+  pages = {797--801}
+}
+</pre></td>
+</tr>
+<tr id="shearer1999automatic" class="entry">
+	<td>Shearer K, Venkatesh S and Dorai C (1999), <i>"Automatic isolation of speech in news footage for audio event detection"</i>, In 5th International Biennial Conference on Digital Image Computing, Techniques and Applications. , pp. 78-83.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('shearer1999automatic','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_shearer1999automatic" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{shearer1999automatic,
+  author = {Shearer, K and Venkatesh, Svetha and Dorai, C},
+  title = {Automatic isolation of speech in news footage for audio event detection},
+  booktitle = {5th International Biennial Conference on Digital Image Computing, Techniques and Applications},
+  year = {1999},
+  pages = {78--83}
+}
+</pre></td>
+</tr>
+<tr id="srinivasan1999robot" class="entry">
+	<td>Srinivasan MV, Chahl JS, Weber K, Venkatesh S, Nagle MG and Zhang S-W (1999), <i>"Robot navigation inspired by principles of insect vision"</i>, Robotics and Autonomous Systems.  Vol. 26(2), pp. 203-216. Elsevier.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('srinivasan1999robot','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_srinivasan1999robot" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{srinivasan1999robot,
+  author = {Srinivasan, Mandyam V and Chahl, Javaan S and Weber, Keven and Venkatesh, Svetha and Nagle, Martin G and Zhang, Shao-Wu},
+  title = {Robot navigation inspired by principles of insect vision},
+  journal = {Robotics and Autonomous Systems},
+  publisher = {Elsevier},
+  year = {1999},
+  volume = {26},
+  number = {2},
+  pages = {203--216}
+}
+</pre></td>
+</tr>
+<tr id="takatsuka1999schematics" class="entry">
+	<td>Takatsuka M, Caelli T, West G and Venkatesh S (1999), <i>"Schematics and 3d object interpretation using symbolic representation and distributed matching strategies"</i>, In GREC'99: Third International Workshop on Graphics Recognition. , pp. 236-306.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('takatsuka1999schematics','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_takatsuka1999schematics" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{takatsuka1999schematics,
+  author = {Takatsuka, M and Caelli, T and West, G and Venkatesh, Svetha},
+  title = {Schematics and 3d object interpretation using symbolic representation and distributed matching strategies},
+  booktitle = {GREC'99: Third International Workshop on Graphics Recognition},
+  year = {1999},
+  pages = {236-306}
+}
+</pre></td>
+</tr>
+<tr id="takatsuka1999symbolic" class="entry">
+	<td>Takatsuka M, Caelli TM, West GA and Venkatesh S (1999), <i>"Symbolic representation and distributed matching strategies for schematics"</i>, In Fifth International Conference on Document Analysis and Recognition. , pp. 693-696.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('takatsuka1999symbolic','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_takatsuka1999symbolic" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{takatsuka1999symbolic,
+  author = {Takatsuka, Masahiro and Caelli, Terry M and West, Geoff AW and Venkatesh, Svetha},
+  title = {Symbolic representation and distributed matching strategies for schematics},
+  booktitle = {Fifth International Conference on Document Analysis and Recognition},
+  year = {1999},
+  pages = {693--696}
+}
+</pre></td>
+</tr>
+<tr id="takatsuka1999low" class="entry">
+	<td>Takatsuka M, West GA, Venkatesh S and Caelli TM (1999), <i>"Low-cost interactive active monocular range finder"</i>, In IEEE Computer Society Conference on Computer Vision and Pattern Recognition.  Vol. 1, pp. 444-449.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('takatsuka1999low','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_takatsuka1999low" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{takatsuka1999low,
+  author = {Takatsuka, Masahiro and West, Geoff AW and Venkatesh, Svetha and Caelli, Terry M},
+  title = {Low-cost interactive active monocular range finder},
+  booktitle = {IEEE Computer Society Conference on Computer Vision and Pattern Recognition},
+  year = {1999},
+  volume = {1},
+  pages = {444--449}
+}
+</pre></td>
+</tr>
+<tr id="tuah1999performance" class="entry">
+	<td>Tuah NJ, Kumar M and Venkatesh S (1999), <i>"A performance model of speculative prefetching in distributed information systems"</i>, In 13th International and 10th Symposium on Parallel and Distributed Processing, IPPS/SPDP. , pp. 75-80.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('tuah1999performance','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_tuah1999performance" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{tuah1999performance,
+  author = {Tuah, Nor Jaidi and Kumar, Mohan and Venkatesh, Svetha},
+  title = {A performance model of speculative prefetching in distributed information systems},
+  booktitle = {13th International and 10th Symposium on Parallel and Distributed Processing, IPPS/SPDP},
+  year = {1999},
+  pages = {75--80}
+}
+</pre></td>
+</tr>
+<tr id="weber1999insect" class="entry">
+	<td>Weber K, Venkatesh S and Srinivasan M (1999), <i>"Insect-inspired robotic homing"</i>, Adaptive Behavior.  Vol. 7(1), pp. 65-97. Sage Publications.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('weber1999insect','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_weber1999insect" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{weber1999insect,
+  author = {Weber, Keven and Venkatesh, Svetha and Srinivasan, Mandyam},
+  title = {Insect-inspired robotic homing},
+  journal = {Adaptive Behavior},
+  publisher = {Sage Publications},
+  year = {1999},
+  volume = {7},
+  number = {1},
+  pages = {65--97}
+}
+</pre></td>
+</tr>
+</tbody>
+</table>
+<footer>
+ <small>Created by <a href="http://jabref.sourceforge.net">JabRef</a> on 04/12/2017.</small>
+</footer>
+<!-- file generated by JabRef -->
+</body>
+</html>

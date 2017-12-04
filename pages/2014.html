@@ -1,0 +1,1074 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<title>JabRef references</title>
+<meta http-equiv="Content-Type" content="text/html; charset=windows-1252">
+<script type="text/javascript">
+<!--
+// QuickSearch script for JabRef HTML export 
+// Version: 3.0
+//
+// Copyright (c) 2006-2011, Mark Schenk
+//
+// This software is distributed under a Creative Commons Attribution 3.0 License
+// http://creativecommons.org/licenses/by/3.0/
+//
+// Features:
+// - intuitive find-as-you-type searching
+//    ~ case insensitive
+//    ~ ignore diacritics (optional)
+//
+// - search with/without Regular Expressions
+// - match BibTeX key
+//
+
+// Search settings
+var searchAbstract = true;	// search in abstract
+var searchReview = true;	// search in review
+
+var noSquiggles = true; 	// ignore diacritics when searching
+var searchRegExp = false; 	// enable RegExp searches
+
+
+if (window.addEventListener) {
+	window.addEventListener("load",initSearch,false); }
+else if (window.attachEvent) {
+	window.attachEvent("onload", initSearch); }
+
+function initSearch() {
+	// check for quick search table and searchfield
+	if (!document.getElementById('qs_table')||!document.getElementById('quicksearch')) { return; }
+
+	// load all the rows and sort into arrays
+	loadTableData();
+	
+	//find the query field
+	qsfield = document.getElementById('qs_field');
+
+	// previous search term; used for speed optimisation
+	prevSearch = '';
+
+	//find statistics location
+	stats = document.getElementById('stat');
+	setStatistics(-1);
+	
+	// set up preferences
+	initPreferences();
+
+	// shows the searchfield
+	document.getElementById('quicksearch').style.display = 'block';
+	document.getElementById('qs_field').onkeyup = quickSearch;
+}
+
+function loadTableData() {
+	// find table and appropriate rows
+	searchTable = document.getElementById('qs_table');
+	var allRows = searchTable.getElementsByTagName('tbody')[0].getElementsByTagName('tr');
+
+	// split all rows into entryRows and infoRows (e.g. abstract, review, bibtex)
+	entryRows = new Array(); infoRows = new Array(); absRows = new Array(); revRows = new Array();
+
+	// get data from each row
+	entryRowsData = new Array(); absRowsData = new Array(); revRowsData = new Array(); 
+	
+	BibTeXKeys = new Array();
+	
+	for (var i=0, k=0, j=0; i<allRows.length;i++) {
+		if (allRows[i].className.match(/entry/)) {
+			entryRows[j] = allRows[i];
+			entryRowsData[j] = stripDiacritics(getTextContent(allRows[i]));
+			allRows[i].id ? BibTeXKeys[j] = allRows[i].id : allRows[i].id = 'autokey_'+j;
+			j ++;
+		} else {
+			infoRows[k++] = allRows[i];
+			// check for abstract/review
+			if (allRows[i].className.match(/abstract/)) {
+				absRows.push(allRows[i]);
+				absRowsData[j-1] = stripDiacritics(getTextContent(allRows[i]));
+			} else if (allRows[i].className.match(/review/)) {
+				revRows.push(allRows[i]);
+				revRowsData[j-1] = stripDiacritics(getTextContent(allRows[i]));
+			}
+		}
+	}
+	//number of entries and rows
+	numEntries = entryRows.length;
+	numInfo = infoRows.length;
+	numAbs = absRows.length;
+	numRev = revRows.length;
+}
+
+function quickSearch(){
+	
+	tInput = qsfield;
+
+	if (tInput.value.length == 0) {
+		showAll();
+		setStatistics(-1);
+		qsfield.className = '';
+		return;
+	} else {
+		t = stripDiacritics(tInput.value);
+
+		if(!searchRegExp) { t = escapeRegExp(t); }
+			
+		// only search for valid RegExp
+		try {
+			textRegExp = new RegExp(t,"i");
+			closeAllInfo();
+			qsfield.className = '';
+		}
+			catch(err) {
+			prevSearch = tInput.value;
+			qsfield.className = 'invalidsearch';
+			return;
+		}
+	}
+	
+	// count number of hits
+	var hits = 0;
+
+	// start looping through all entry rows
+	for (var i = 0; cRow = entryRows[i]; i++){
+
+		// only show search the cells if it isn't already hidden OR if the search term is getting shorter, then search all
+		if(cRow.className.indexOf('noshow')==-1 || tInput.value.length <= prevSearch.length){
+			var found = false; 
+
+			if (entryRowsData[i].search(textRegExp) != -1 || BibTeXKeys[i].search(textRegExp) != -1){ 
+				found = true;
+			} else {
+				if(searchAbstract && absRowsData[i]!=undefined) {
+					if (absRowsData[i].search(textRegExp) != -1){ found=true; } 
+				}
+				if(searchReview && revRowsData[i]!=undefined) {
+					if (revRowsData[i].search(textRegExp) != -1){ found=true; } 
+				}
+			}
+			
+			if (found){
+				cRow.className = 'entry show';
+				hits++;
+			} else {
+				cRow.className = 'entry noshow';
+			}
+		}
+	}
+
+	// update statistics
+	setStatistics(hits)
+	
+	// set previous search value
+	prevSearch = tInput.value;
+}
+
+
+// Strip Diacritics from text
+// http://stackoverflow.com/questions/990904/javascript-remove-accents-in-strings
+
+// String containing replacement characters for stripping accents 
+var stripstring = 
+    'AAAAAAACEEEEIIII'+
+    'DNOOOOO.OUUUUY..'+
+    'aaaaaaaceeeeiiii'+
+    'dnooooo.ouuuuy.y'+
+    'AaAaAaCcCcCcCcDd'+
+    'DdEeEeEeEeEeGgGg'+
+    'GgGgHhHhIiIiIiIi'+
+    'IiIiJjKkkLlLlLlL'+
+    'lJlNnNnNnnNnOoOo'+
+    'OoOoRrRrRrSsSsSs'+
+    'SsTtTtTtUuUuUuUu'+
+    'UuUuWwYyYZzZzZz.';
+
+function stripDiacritics(str){
+
+    if(noSquiggles==false){
+        return str;
+    }
+
+    var answer='';
+    for(var i=0;i<str.length;i++){
+        var ch=str[i];
+        var chindex=ch.charCodeAt(0)-192;   // Index of character code in the strip string
+        if(chindex>=0 && chindex<stripstring.length){
+            // Character is within our table, so we can strip the accent...
+            var outch=stripstring.charAt(chindex);
+            // ...unless it was shown as a '.'
+            if(outch!='.')ch=outch;
+        }
+        answer+=ch;
+    }
+    return answer;
+}
+
+// http://stackoverflow.com/questions/3446170/escape-string-for-use-in-javascript-regex
+// NOTE: must escape every \ in the export code because of the JabRef Export...
+function escapeRegExp(str) {
+  return str.replace(/[-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, "\\$&");
+}
+
+function toggleInfo(articleid,info) {
+
+	var entry = document.getElementById(articleid);
+	var abs = document.getElementById('abs_'+articleid);
+	var rev = document.getElementById('rev_'+articleid);
+	var bib = document.getElementById('bib_'+articleid);
+	
+	if (abs && info == 'abstract') {
+		abs.className.indexOf('noshow') == -1?abs.className = 'abstract noshow':abs.className = 'abstract show';
+	} else if (rev && info == 'review') {
+		rev.className.indexOf('noshow') == -1?rev.className = 'review noshow':rev.className = 'review show';
+	} else if (bib && info == 'bibtex') {
+		bib.className.indexOf('noshow') == -1?bib.className = 'bibtex noshow':bib.className = 'bibtex show';
+	} else { 
+		return;
+	}
+
+	// check if one or the other is available
+	var revshow; var absshow; var bibshow;
+	(abs && abs.className.indexOf('noshow') == -1)? absshow = true: absshow = false;
+	(rev && rev.className.indexOf('noshow') == -1)? revshow = true: revshow = false;	
+	(bib && bib.className.indexOf('noshow') == -1)? bibshow = true: bibshow = false;
+	
+	// highlight original entry
+	if(entry) {
+		if (revshow || absshow || bibshow) {
+		entry.className = 'entry highlight show';
+		} else {
+		entry.className = 'entry show';
+		}
+	}
+	
+	// When there's a combination of abstract/review/bibtex showing, need to add class for correct styling
+	if(absshow) {
+		(revshow||bibshow)?abs.className = 'abstract nextshow':abs.className = 'abstract';
+	} 
+	if (revshow) {
+		bibshow?rev.className = 'review nextshow': rev.className = 'review';
+	}	
+	
+}
+
+function setStatistics (hits) {
+	if(hits < 0) { hits=numEntries; }
+	if(stats) { stats.firstChild.data = hits + '/' + numEntries}
+}
+
+function getTextContent(node) {
+	// Function written by Arve Bersvendsen
+	// http://www.virtuelvis.com
+	
+	if (node.nodeType == 3) {
+	return node.nodeValue;
+	} // text node
+	if (node.nodeType == 1 && node.className != "infolinks") { // element node
+	var text = [];
+	for (var chld = node.firstChild;chld;chld=chld.nextSibling) {
+		text.push(getTextContent(chld));
+	}
+	return text.join("");
+	} return ""; // some other node, won't contain text nodes.
+}
+
+function showAll(){
+	closeAllInfo();
+	for (var i = 0; i < numEntries; i++){ entryRows[i].className = 'entry show'; }
+}
+
+function closeAllInfo(){
+	for (var i=0; i < numInfo; i++){
+		if (infoRows[i].className.indexOf('noshow') ==-1) {
+			infoRows[i].className = infoRows[i].className + ' noshow';
+		}
+	}
+}
+
+function clearQS() {
+	qsfield.value = '';
+	showAll();
+}
+
+function redoQS(){
+	showAll();
+	quickSearch(qsfield);
+}
+
+function updateSetting(obj){
+	var option = obj.id;
+	var checked = obj.value;
+
+	switch(option)
+	 {
+	 case "opt_searchAbs":
+	   searchAbstract=!searchAbstract;
+	   redoQS();
+	   break;
+	 case "opt_searchRev":
+	   searchReview=!searchReview;
+	   redoQS();
+	   break;
+	 case "opt_useRegExp":
+	   searchRegExp=!searchRegExp;
+	   redoQS();
+	   break;
+	 case "opt_noAccents":
+	   noSquiggles=!noSquiggles;
+	   loadTableData();
+	   redoQS();
+	   break;
+	 }
+}
+
+function initPreferences(){
+	if(searchAbstract){document.getElementById("opt_searchAbs").checked = true;}
+	if(searchReview){document.getElementById("opt_searchRev").checked = true;}
+	if(noSquiggles){document.getElementById("opt_noAccents").checked = true;}
+	if(searchRegExp){document.getElementById("opt_useRegExp").checked = true;}
+	
+	if(numAbs==0) {document.getElementById("opt_searchAbs").parentNode.style.display = 'none';}
+	if(numRev==0) {document.getElementById("opt_searchRev").parentNode.style.display = 'none';}	
+}
+
+function toggleSettings(){
+	var togglebutton = document.getElementById('showsettings');
+	var settings = document.getElementById('settings');
+	
+	if(settings.className == "hidden"){
+		settings.className = "show";
+		togglebutton.innerText = "close settings";
+		togglebutton.textContent = "close settings";
+	}else{
+		settings.className = "hidden";
+		togglebutton.innerText = "settings...";		
+		togglebutton.textContent = "settings...";
+	}
+}
+
+-->
+</script>
+<style type="text/css">
+body { background-color: white; font-family: Arial, sans-serif; font-size: 13px; line-height: 1.2; padding: 1em; color: #2E2E2E; width: 50em; margin: auto auto; }
+
+form#quicksearch { width: auto; border-style: solid; border-color: gray; border-width: 1px 0px; padding: 0.7em 0.5em; display:none; position:relative; }
+span#searchstat {padding-left: 1em;}
+
+div#settings { margin-top:0.7em; /* border-bottom: 1px transparent solid; background-color: #efefef; border: 1px grey solid; */ }
+div#settings ul {margin: 0; padding: 0; }
+div#settings li {margin: 0; padding: 0 1em 0 0; display: inline; list-style: none; }
+div#settings li + li { border-left: 2px #efefef solid; padding-left: 0.5em;}
+div#settings input { margin-bottom: 0px;}
+
+div#settings.hidden {display:none;}
+
+#showsettings { border: 1px grey solid; padding: 0 0.5em; float:right; line-height: 1.6em; text-align: right; }
+#showsettings:hover { cursor: pointer; }
+
+.invalidsearch { background-color: red; }
+input[type="button"] { background-color: #efefef; border: 1px #2E2E2E solid;}
+
+table { border: 1px gray none; width: 100%; empty-cells: show; border-spacing: 0em 0.1em; margin: 1em 0em; }
+th, td { border: none; padding: 0.5em; vertical-align: top; text-align: justify; }
+
+td a { color: navy; text-decoration: none; }
+td a:hover  { text-decoration: underline; }
+
+tr.noshow { display: none;}
+tr.highlight td { background-color: #EFEFEF; border-top: 2px #2E2E2E solid; font-weight: bold; }
+tr.abstract td, tr.review td, tr.bibtex td { background-color: #EFEFEF; text-align: justify; border-bottom: 2px #2E2E2E solid; }
+tr.nextshow td { border-bottom-style: none; }
+
+tr.bibtex pre { width: 100%; overflow: auto; white-space: pre-wrap;}
+p.infolinks { margin: 0.3em 0em 0em 0em; padding: 0px; }
+
+@media print {
+	p.infolinks, #qs_settings, #quicksearch, t.bibtex { display: none !important; }
+	tr { page-break-inside: avoid; }
+}
+</style>
+</head>
+<body>
+
+<form action="" id="quicksearch">
+<input type="text" id="qs_field" autocomplete="off" placeholder="Type to search..." /> <input type="button" onclick="clearQS()" value="clear" />
+<span id="searchstat">Matching entries: <span id="stat">0</span></span>
+<div id="showsettings" onclick="toggleSettings()">settings...</div>
+<div id="settings" class="hidden">
+<ul>
+<li><input type="checkbox" class="search_setting" id="opt_searchAbs" onchange="updateSetting(this)"><label for="opt_searchAbs"> include abstract</label></li>
+<li><input type="checkbox" class="search_setting" id="opt_searchRev" onchange="updateSetting(this)"><label for="opt_searchRev"> include review</label></li>
+<li><input type="checkbox" class="search_setting" id="opt_useRegExp" onchange="updateSetting(this)"><label for="opt_useRegExp"> use RegExp</label></li>
+<li><input type="checkbox" class="search_setting" id="opt_noAccents" onchange="updateSetting(this)"><label for="opt_noAccents"> ignore accents</label></li>
+</ul>
+</div>
+</form>
+<table id="qs_table" border="1">
+<tbody>
+<tr id="adams2014social" class="entry">
+	<td>Adams B, Phung D and Venkatesh S (2014), <i>"Social reader: towards browsing the social web"</i>, Multimedia tools and applications.  Vol. 69(3), pp. 951-990. Springer.
+	<p class="infolinks">[<a href="javascript:toggleInfo('adams2014social','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('adams2014social','bibtex')">BibTeX</a>] [<a href="http://link.springer.com/article/10.1007%2Fs11042-012-1138-5" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_adams2014social" class="abstract noshow">
+	<td><b>Abstract</b>: We describe Social Reader, a feed-reader-plus-social-network aggregator that mines comments from social media in order to display a user’s relational neighborhood as a navigable social network. Social Reader’s network visualization enhances mutual awareness of blogger communities, facilitates their exploration and growth with a fully dragn- drop interface, and provides novel ways to filter and summarize people, groups, blogs and comments. We discuss the architecture behind the reader, highlight tasks it adds to the workflow of a typical reader, and assess their cost. We also explore the potential of mood-based features in social media applications. Mood is particularly relevant to social media, reflecting the personal nature of the medium. We explore two prototype mood-based features: colour coding the mood of recent posts according to a valence/arousal map, and a mood-based abstract of recent activity using image media. A six week study of the software involving 20 users confirmed the usefulness of the novel visual display, via a quantitative analysis of use logs, and an exit survey.</td>
+</tr>
+<tr id="bib_adams2014social" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{adams2014social,
+  author = {Adams, Brett and Phung, Dinh and Venkatesh, Svetha},
+  title = {Social reader: towards browsing the social web},
+  journal = {Multimedia tools and applications},
+  publisher = {Springer},
+  year = {2014},
+  volume = {69},
+  number = {3},
+  pages = {951--990},
+  url = {http://link.springer.com/article/10.1007%2Fs11042-012-1138-5}
+}
+</pre></td>
+</tr>
+<tr id="AranPhamVenk2014" class="entry">
+	<td>Arandjelovi&#263; O, Pham D and Venkatesh S (2014), <i>"Stream quantiles via maximal entropy histograms."</i>, International Conference on Neural Information Processing (ICONIP).  Vol. II, pp. 327-334.
+	<p class="infolinks">[<a href="javascript:toggleInfo('AranPhamVenk2014','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('AranPhamVenk2014','bibtex')">BibTeX</a>] [<a href="http://arxiv.org/pdf/1409.7289.pdf" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_AranPhamVenk2014" class="abstract noshow">
+	<td><b>Abstract</b>: We address the problem of estimating the running quantile of a data stream when the memory for storing observations is limited. We (i) highlight the limitations of approaches previously described in the literature which make them unsuitable for non-stationary streams, (ii) describe a novel principle for the utilization of the available storage space, and (iii) introduce two novel algorithms which exploit the proposed principle. Experiments on three large real-world data sets demonstrate that the proposed methods vastly outperform the existing alternatives.</td>
+</tr>
+<tr id="bib_AranPhamVenk2014" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{AranPhamVenk2014,
+  author = {Arandjelovi&#263;, O. and Pham, D. and Venkatesh, Svetha.},
+  title = {Stream quantiles via maximal entropy histograms.},
+  journal = {International Conference on Neural Information Processing (ICONIP)},
+  year = {2014},
+  volume = {II},
+  pages = {327--334},
+  url = {http://arxiv.org/pdf/1409.7289.pdf}
+}
+</pre></td>
+</tr>
+<tr id="beykikhoshkdata" class="entry">
+	<td>Beykikhoshk A, Arandjelovic O, Phung DQ, Venkatesh S and Caelli T (2014), <i>"Data-mining twitter and the autism spectrum disorder: A Pilot study"</i>, In International Conference on Advances in Social Networks Analysis and Mining, (ASONAM). , pp. 349-356.
+	<p class="infolinks">[<a href="javascript:toggleInfo('beykikhoshkdata','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('beykikhoshkdata','bibtex')">BibTeX</a>] [<a href="http://dx.doi.org/10.1109/ASONAM.2014.6921609" target="_blank">DOI</a>] [<a href="http://dx.doi.org/10.1109/ASONAM.2014.6921609" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_beykikhoshkdata" class="abstract noshow">
+	<td><b>Abstract</b>: The autism spectrum disorder (ASD) is increasingly being recognized as a major public health issue which affects approximately 0.5–0.6% of the population. Promoting the general awareness of the disorder, increasing the engagement with the affected individuals and their carers, and understanding the success of penetration of the current clinical recommendations in the target communities, is crucial in driving research as well as policy. The aim of the present work is to investigate if Twitter, as a highly popular platform for information exchange, can be used as a data-mining source which could aid in the aforementioned challenges. Specifically, using a large data set of harvested tweets, we present a series of experiments which examine a range of linguistic and semantic aspects of messages posted by individuals interested in ASD. Our findings, the first of their nature in the published scientific literature, strongly motivate additional research on this topic and present a methodological basis for further work.</td>
+</tr>
+<tr id="bib_beykikhoshkdata" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{beykikhoshkdata,
+  author = {Adham Beykikhoshk and Ognjen Arandjelovic and Dinh Q. Phung and Svetha Venkatesh and Terry Caelli},
+  title = {Data-mining twitter and the autism spectrum disorder: A Pilot study},
+  booktitle = {International Conference on Advances in Social Networks Analysis and Mining, (ASONAM)},
+  year = {2014},
+  pages = {349--356},
+  url = {http://dx.doi.org/10.1109/ASONAM.2014.6921609},
+  doi = {10.1109/ASONAM.2014.6921609}
+}
+</pre></td>
+</tr>
+<tr id="daoeffect" class="entry">
+	<td>Bo Dao Thin Nguyen DQP and Venkatesh S (2014), <i>"Effect of Mood, Social Connectivity and Age in Online Depression Community via Topic and Linguistic Analysis"</i>, In 15th International Conference on Web Information Systems Engineering - (WISE). , pp. 398-407.
+	<p class="infolinks">[<a href="javascript:toggleInfo('daoeffect','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('daoeffect','bibtex')">BibTeX</a>] [<a href="http://dx.doi.org/10.1007/978-3-319-11749-2_30" target="_blank">DOI</a>] [<a href="http://link.springer.com/chapter/10.1007%2F978-3-319-11749-2_30" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_daoeffect" class="abstract noshow">
+	<td><b>Abstract</b>: Depression afflicts one in four people during their lives. Several studies have shown that for the isolated and mentally ill, the Web and social media provide effective platforms for supports and treatments as well as to acquire scientific, clinical understanding of this mental condition. More and more individuals affected by depression join online communities to seek for information, express themselves, share their concerns and look for supports [12]. For the first time, we collect and study a large online depression community of more than 12,000 active members from Live Journal. We examine the effect of mood, social connectivity and age on the online messages authored by members in an online depression community. The posts are considered in two aspects: what is written (topic) and how it is written (language style). We use statistical and machine learning methods to discriminate the posts made by bloggers in low versus high valence mood, in different age categories and in different degrees of social connectivity. Using statistical tests, language styles are found to be significantly different between low and high valence cohorts, whilst topics are significantly different between people whose different degrees of social connectivity. High performance is achieved for low versus high valence post classification using writing style as features. The finding suggests the potential of using social media in depression screening, especially in online setting.</td>
+</tr>
+<tr id="bib_daoeffect" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{daoeffect,
+  author = {Bo Dao,Thin Nguyen, Dinh Q. Phung and Svetha Venkatesh},
+  title = {Effect of Mood, Social Connectivity and Age in Online Depression Community via Topic and Linguistic Analysis},
+  booktitle = {15th International Conference on Web Information Systems Engineering - (WISE)},
+  year = {2014},
+  pages = {398--407},
+  url = {http://link.springer.com/chapter/10.1007%2F978-3-319-11749-2_30},
+  doi = {10.1007/978-3-319-11749-2_30}
+}
+</pre></td>
+</tr>
+<tr id="dao2014analysis" class="entry">
+	<td>Dao B, Nguyen T, Venkatesh S and Phung D (2014), <i>"Analysis of circadian rhythms from online communities of individuals with affective disorders"</i>, In International Conference on Data Science and Advanced Analytics (DSAA). , pp. 463-469.
+	<p class="infolinks">[<a href="javascript:toggleInfo('dao2014analysis','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('dao2014analysis','bibtex')">BibTeX</a>] [<a href="http://ieeexplore.ieee.org/xpl/articleDetails.jsp?arnumber=7058113" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_dao2014analysis" class="abstract noshow">
+	<td><b>Abstract</b>: The circadian system regulates 24 hour rhythms in biological creatures. It impacts mood regulation. The disruptions of circadian rhythms cause destabilization in individuals with affective disorders, such as depression and bipolar disorders. Previous work has examined the role of the circadian system on effects of light interactions on mood-related systems, the effects of light manipulation on brain, the impact of chronic stress on rhythms. However, such studies have been conducted in small, preselected populations. The deluge of data is now changing the landscape of research practice. The unprecedented growth of social media data allows one to study individual behavior across large and diverse populations. In particular, individuals with affective disorders from online communities have not been examined rigorously. In this paper, we aim to use social media as a sensor to identify circadian patterns for individuals with affective disorders in online communities.We use a large scale study cohort of data collecting from online affective disorder communities. We analyze changes in hourly, daily, weekly and seasonal affect of these clinical groups in contrast with control groups of general communities. By comparing the behaviors between the clinical groups and the control groups, our findings show that individuals with affective disorders show a significant distinction in their circadian rhythms across the online activity. The results shed light on the potential of using social media for identifying diurnal individual variation in affective state, providing key indicators and risk factors for noninvasive wellbeing monitoring and prediction.</td>
+</tr>
+<tr id="bib_dao2014analysis" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{dao2014analysis,
+  author = {Dao, Bo and Nguyen, Thin and Venkatesh, Svetha and Phung, Dinh},
+  title = {Analysis of circadian rhythms from online communities of individuals with affective disorders},
+  booktitle = {International Conference on Data Science and Advanced Analytics (DSAA)},
+  year = {2014},
+  pages = {463--469},
+  url = {http://ieeexplore.ieee.org/xpl/articleDetails.jsp?arnumber=7058113}
+}
+</pre></td>
+</tr>
+<tr id="gopakumar_tran_phung_venkatesh_icpr_ws14" class="entry">
+	<td>Gopakumar S, Tran T, Phung D and Venkatesh S (2014), <i>"Stabilizing Sparse Cox Model using Clinical Structures in Electronic Medical Records"</i>, In Proceedings of the Second International Workshop on Pattern Recognition for Healthcare Analytics. 
+	<p class="infolinks">[<a href="javascript:toggleInfo('gopakumar_tran_phung_venkatesh_icpr_ws14','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('gopakumar_tran_phung_venkatesh_icpr_ws14','bibtex')">BibTeX</a>] [<a href="http://arxiv.org/pdf/1407.6094v1.pdf" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_gopakumar_tran_phung_venkatesh_icpr_ws14" class="abstract noshow">
+	<td><b>Abstract</b>: Stability in clinical prediction models is crucial for transferability between studies, yet has received little attention. The problem is paramount in high dimensional data which invites sparse models with feature selection capability. We introduce an effective method to stabilize sparse Cox model of time-to-events using clinical structures inherent in Electronic Medical Records. Model estimation is stabilized using a feature graph derived from two types of EMR structures: temporal structure of disease and intervention recurrences, and hierarchical structure of medical knowledge and practices. We demonstrate the efficacy of the method in predicting time-to-readmission of heart failure patients. On two stability measures - the Jaccard index and the Consistency index - the use of clinical structures significantly increased feature stability without hurting discriminative power. Our model reported a competitive AUC of 0.64 (95% CIs: [0.58,0.69]) for 6 months prediction.</td>
+</tr>
+<tr id="bib_gopakumar_tran_phung_venkatesh_icpr_ws14" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{gopakumar_tran_phung_venkatesh_icpr_ws14,
+  author = {Gopakumar, Shivapratap and Tran, Truyen and Phung, Dinh and Venkatesh, Svetha},
+  title = {Stabilizing Sparse Cox Model using Clinical Structures in Electronic Medical Records},
+  booktitle = {Proceedings of the Second International Workshop on Pattern Recognition for Healthcare Analytics},
+  year = {2014},
+  url = {http://arxiv.org/pdf/1407.6094v1.pdf}
+}
+</pre></td>
+</tr>
+<tr id="gupta2014modelling" class="entry">
+	<td>Gupta S, Phung D and Venkatesh S (2014), <i>"Modelling multilevel data in multimedia: A hierarchical factor analysis approach"</i>, Multimedia Tools and Applications. , pp. 1-23. Springer.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('gupta2014modelling','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_gupta2014modelling" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{gupta2014modelling,
+  author = {Gupta, Sunil and Phung, Dinh and Venkatesh, Svetha},
+  title = {Modelling multilevel data in multimedia: A hierarchical factor analysis approach},
+  journal = {Multimedia Tools and Applications},
+  publisher = {Springer},
+  year = {2014},
+  pages = {1--23}
+}
+</pre></td>
+</tr>
+<tr id="gupta2014machine" class="entry">
+	<td>Gupta S, Tran T, Luo W, Phung D, Kennedy RL, Broad A, Campbell D, Kipp D, Singh M, Khasraw M, Matheson L, Ashley D and Venkatesh S (2014), <i>"Machine-learning prediction of cancer survival: a retrospective study using electronic administrative records and a cancer registry"</i>, BMJ open.  Vol. 4(3), pp. e004007. British Medical Journal Publishing Group.
+	<p class="infolinks">[<a href="javascript:toggleInfo('gupta2014machine','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('gupta2014machine','bibtex')">BibTeX</a>] [<a href="http://bmjopen.bmj.com/content/4/3/e004007.full.pdf+html" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_gupta2014machine" class="abstract noshow">
+	<td><b>Abstract</b>: Using the prediction of cancer outcome as a model, we have tested the hypothesis that through analysing routinely collected digital data contained in an electronic administrative record (EAR), using machine-learning techniques, we could enhance conventional methods in predicting clinical outcomes.</td>
+</tr>
+<tr id="bib_gupta2014machine" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{gupta2014machine,
+  author = {Gupta, Sunil and Tran, Truyen and Luo, Wei and Phung, Dinh and Kennedy, Richard Lee and Broad, Adam and Campbell, David and Kipp, David and Singh, Madhu and Khasraw, Mustafa and Matheson, Leigh and Ashley, David and Venkatesh, Svetha},
+  title = {Machine-learning prediction of cancer survival: a retrospective study using electronic administrative records and a cancer registry},
+  journal = {BMJ open},
+  publisher = {British Medical Journal Publishing Group},
+  year = {2014},
+  volume = {4},
+  number = {3},
+  pages = {e004007},
+  url = {http://bmjopen.bmj.com/content/4/3/e004007.full.pdf+html}
+}
+</pre></td>
+</tr>
+<tr id="gupta2014matrix" class="entry">
+	<td>Gupta SK, Phung D, Adams B and Venkatesh S (2014), <i>"A matrix factorization framework for jointly analyzing multiple nonnegative data sources"</i>, In Data Mining for Service. , pp. 151-170. Springer.
+	<p class="infolinks">[<a href="javascript:toggleInfo('gupta2014matrix','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('gupta2014matrix','bibtex')">BibTeX</a>] [<a href="https://www.researchgate.net/profile/Sunil_Gupta28/publication/260300069_A_Matrix_Factorization_Framework_for_Jointly_Analyzing_Multiple_Nonnegative_Data_Sources/links/02e7e537f3a455cc53000000.pdf" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_gupta2014matrix" class="abstract noshow">
+	<td><b>Abstract</b>: Nonnegative matrix factorization based methods provide one of the simplest and most effective approaches to text mining. However, their applicability is mainly limited to analyzing a single data source. In this paper, we propose a novel joint matrix factorization framework which can jointly analyze multiple data sources by exploiting their shared and individual structures. The proposed framework is flexible to handle any arbitrary sharing configurations encountered in real world data. We derive an efficient algorithm for learning the factorization and show that its convergence is theoretically guaranteed. We demonstrate the utility and effectiveness of the proposed framework in two real-world applications–improving social media retrieval using auxiliary sources and cross-social media retrieval. Representing each social media source using their textual tags, for both applications, we show that retrieval performance exceeds the existing state-of-the-art techniques. The proposed solution provides a generic framework and can be applicable to a wider context in data mining wherever one needs to exploit mutual and individual knowledge present across multiple data sources.</td>
+</tr>
+<tr id="bib_gupta2014matrix" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@incollection{gupta2014matrix,
+  author = {Gupta, Sunil Kumar and Phung, Dinh and Adams, Brett and Venkatesh, Svetha},
+  title = {A matrix factorization framework for jointly analyzing multiple nonnegative data sources},
+  booktitle = {Data Mining for Service},
+  publisher = {Springer},
+  year = {2014},
+  pages = {151--170},
+  url = {https://www.researchgate.net/profile/Sunil_Gupta28/publication/260300069_A_Matrix_Factorization_Framework_for_Jointly_Analyzing_Multiple_Nonnegative_Data_Sources/links/02e7e537f3a455cc53000000.pdf}
+}
+</pre></td>
+</tr>
+<tr id="guptakeeping" class="entry">
+	<td>Gupta SK, Rana S, Phung DQ and Venkatesh S (2014), <i>"Keeping up with Innovation: A Predictive Framework for Modeling Healthcare Data with Evolving Clinical Interventions"</i>, In International Conference on Data Mining. , pp. 235-243.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('guptakeeping','review')">Review</a>]  [<a href="javascript:toggleInfo('guptakeeping','bibtex')">BibTeX</a>] [<a href="http://dx.doi.org/10.1137/1.9781611973440.27" target="_blank">DOI</a>] [<a href="http://dx.doi.org/10.1137/1.9781611973440.27" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="rev_guptakeeping" class="review noshow">
+	<td><b>Review</b>: Medical outcomes are inexorably linked to patient illness and clinical interventions. Interventions change the course of disease, crucially determining outcome. Traditional outcome prediction models build a single classifier by augmenting interventions with disease information. Interventions, however, differentially affect prognosis, thus a single prediction rule may not suffice to capture variations. Interventions also evolve over time as more advanced interventions replace older ones. To this end, we propose a Bayesian nonparametric, supervised framework that models a set of intervention groups through a mixture distribution building a separate prediction rule for each group, and allows the mixture distribution to change with time. This is achieved by using a hierarchical Dirichlet process mixture model over the interventions. The outcome is then modeled as conditional on both the latent grouping and the disease information through a Bayesian logistic regression. Experiments on synthetic and medical cohorts for 30-day readmission prediction demonstrate the superiority of the proposed model over clinical and data mining baselines.</td>
+</tr>
+<tr id="bib_guptakeeping" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{guptakeeping,
+  author = {Sunil Kumar Gupta and Santu Rana and Dinh Q. Phung and Svetha Venkatesh},
+  title = {Keeping up with Innovation: A Predictive Framework for Modeling Healthcare Data with Evolving Clinical Interventions},
+  booktitle = {International Conference on Data Mining},
+  year = {2014},
+  pages = {235--243},
+  url = {http://dx.doi.org/10.1137/1.9781611973440.27},
+  doi = {10.1137/1.9781611973440.27}
+}
+</pre></td>
+</tr>
+<tr id="liregularizing" class="entry">
+	<td>Li C, Rana S, Phung DQ and Venkatesh S (2014), <i>"Regularizing Topic Discovery in EMRs with Side Information by Using Hierarchical Bayesian Models"</i>, In 22nd International Conference on Pattern Recognition. , pp. 1307-1312.
+	<p class="infolinks">[<a href="javascript:toggleInfo('liregularizing','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('liregularizing','bibtex')">BibTeX</a>] [<a href="http://dx.doi.org/10.1109/ICPR.2014.234" target="_blank">DOI</a>] [<a href="http://dx.doi.org/10.1109/ICPR.2014.234" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_liregularizing" class="abstract noshow">
+	<td><b>Abstract</b>: We propose a novel hierarchical Bayesian framework, word-distance-dependent Chinese restaurant franchise (wd-dCRF) for topic discovery from a document corpus regularized by side information in the form of word-to-word relations, with an application on Electronic Medical Records (EMRs). Typically, a EMRs dataset consists of several patients (documents) and each patient contains many diagnosis codes (words). We exploit the side information available in the form of a semantic tree structure among the diagnosis codes for semantically-coherent disease topic discovery. We introduce novel functions to compute word-to-word distances when side information is available in the form of tree structures. We derive an efficient inference method for the wddCRF using MCMC technique. We evaluate on a real world medical dataset consisting of about 1000 patients with PolyVascular disease. Compared with the popular topic analysis tool, hierarchical Dirichlet process (HDP), our model discovers topics which are superior in terms of both qualitative and quantitative measures.</td>
+</tr>
+<tr id="bib_liregularizing" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{liregularizing,
+  author = {Cheng Li and Santu Rana and Dinh Q. Phung and Svetha Venkatesh},
+  title = {Regularizing Topic Discovery in EMRs with Side Information by Using Hierarchical Bayesian Models},
+  booktitle = {22nd International Conference on Pattern Recognition},
+  year = {2014},
+  pages = {1307--1312},
+  url = {http://dx.doi.org/10.1109/ICPR.2014.234},
+  doi = {10.1109/ICPR.2014.234}
+}
+</pre></td>
+</tr>
+<tr id="luo_phung_nguyen_tran_venkatesh_iapr14" class="entry">
+	<td>Luo W, Phung D, Nguyen V, Tran T and Venkatesh S (2014), <i>"Speed up health research through topic modeling of coded clinical data"</i>, In International Workshop on Pattern Recognition for Healthcare Analytics. Stockholm, Sweden 
+	<p class="infolinks">[<a href="javascript:toggleInfo('luo_phung_nguyen_tran_venkatesh_iapr14','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('luo_phung_nguyen_tran_venkatesh_iapr14','bibtex')">BibTeX</a>] [<a href="https://docs.google.com/viewer?a=v&pid=sites&srcid=ZGVmYXVsdGRvbWFpbnxpd3ByaGEyfGd4OjU0NmYxNDg4MmU2ZDA0ZDQ" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_luo_phung_nguyen_tran_venkatesh_iapr14" class="abstract noshow">
+	<td><b>Abstract</b>: Although random control trial is the gold standard in medical research, researchers are increasingly looking to alternative data sources for hypothesis generation and early-stage evidence collection. Coded clinical data are collected routinely in most hospitals. While they contain rich information directly related to the real clinical setting, they are both noisy and semantically diverse, making them difficult to analyze with conventional statistical tools. This paper presents a novel application of Bayesian nonparametric modeling to uncover latent information in coded clinical data. For a patient cohort, a Bayesian nonparametric model is used to reveal the common comorbidity groups shared by the patients and the proportion that each comorbidity group is reflected inindividual patient. To demonstrate the method, we present a case study based on hospitalization coding from an Australian hospital. The model recovered 15 comorbidity groups among 1012 patients hospitalized during a month. When patients from two areas of unequal socio-economic status were compared, it reveals higher prevalence of diverticular disease in the region of lower socio-economic status. The study builds a convincing case for using routine coded data to speed up hypothesis generation.</td>
+</tr>
+<tr id="bib_luo_phung_nguyen_tran_venkatesh_iapr14" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{luo_phung_nguyen_tran_venkatesh_iapr14,
+  author = {Wei Luo and Dinh Phung and Vu Nguyen and Truyen Tran and Svetha Venkatesh},
+  title = {Speed up health research through topic modeling of coded clinical data},
+  booktitle = {International Workshop on Pattern Recognition for Healthcare Analytics},
+  year = {2014},
+  url = {https://docs.google.com/viewer?a=v&amp;pid=sites&amp;srcid=ZGVmYXVsdGRvbWFpbnxpd3ByaGEyfGd4OjU0NmYxNDg4MmU2ZDA0ZDQ}
+}
+</pre></td>
+</tr>
+<tr id="nguyen2014affective" class="entry">
+	<td>Nguyen T, Duong T, Phung D and Venkatesh S (2014), <i>"Affective, Linguistic and Topic Patterns in Online Autism Communities"</i>, In Web Information Systems Engineering. , pp. 474-488. Springer International Publishing.
+	<p class="infolinks">[<a href="javascript:toggleInfo('nguyen2014affective','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('nguyen2014affective','bibtex')">BibTeX</a>] [<a href="http://link.springer.com/chapter/10.1007%2F978-3-319-11746-1_35" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_nguyen2014affective" class="abstract noshow">
+	<td><b>Abstract</b>: Online communities offer a platform to support and discuss health issues. They provide a more accessible way to bring people of the same concerns or interests. This paper aims to study the characteristics of online autism communities (called Clinical) in comparison with other online communities (called Control) using data from 110 Live Journal weblog communities. Using machine learning techniques, we comprehensively analyze these online autism communities. We study three key aspects expressed in the blog posts made by members of the communities: sentiment, topics and language style. Sentiment analysis shows that the sentiment of the clinical group has lower valence, indicative of poorer moods than people in control. Topics and language styles are shown to be good predictors of autism posts. The result shows the potential of social media in medical studies for a broad range of purposes such as screening, monitoring and subsequently providing supports for online communities of individuals with special needs.</td>
+</tr>
+<tr id="bib_nguyen2014affective" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@incollection{nguyen2014affective,
+  author = {Nguyen, Thin and Duong, Thi and Phung, Dinh and Venkatesh, Svetha},
+  title = {Affective, Linguistic and Topic Patterns in Online Autism Communities},
+  booktitle = {Web Information Systems Engineering},
+  publisher = {Springer International Publishing},
+  year = {2014},
+  pages = {474--488},
+  url = {http://link.springer.com/chapter/10.1007%2F978-3-319-11746-1_35}
+}
+</pre></td>
+</tr>
+<tr id="nguyen2014fixed" class="entry">
+	<td>Nguyen T, Gupta S, Venkatesh S and Phung D (2014), <i>"Fixed-lag particle filter for continuous context discovery using Indian Buffet Process"</i>, In IEEE International Conference on Pervasive Computing and Communications (PerCom). , pp. 20-28.
+	<p class="infolinks">[<a href="javascript:toggleInfo('nguyen2014fixed','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('nguyen2014fixed','bibtex')">BibTeX</a>] [<a href="http://ieeexplore.ieee.org/xpl/login.jsp?tp=&arnumber=6813939" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_nguyen2014fixed" class="abstract noshow">
+	<td><b>Abstract</b>: Exploiting context from stream data in pervasive environments remains a challenge. We aim to extract proximal context from Bluetooth stream data, using an incremental, Bayesian nonparametric framework that estimates the number of contexts automatically. Unlike current approaches that can only provide final proximal grouping, our method provides proximal grouping and membership of users over time. Additionally, it provides an efficient online inference. We construct co-location matrix over time using Bluetooth data. A Poisson-exponential model is used to factorize this matrix into a factor matrix, interpreted as proximal groups, and a coefficient matrix that indicates factor usage. The coefficient matrix follows the Indian Buffet Process prior, which estimates the number of factors automatically. The non-negativity and sparsity of factors are enforced by using the exponential distribution to generate the factors. We propose a fixed-lag particle filter algorithm to process data incrementally. We compare the incremental inference (particle filter) with full batch inference (Gibbs sampling) in terms of normalized factorization error and execution time. The normalized error obtained through our incremental inference is comparable to that of full batch inference, whilst the execution time is more than 100 times faster. The discovered factors have similar meaning to the results of the popular Louvain method for community detection.</td>
+</tr>
+<tr id="bib_nguyen2014fixed" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{nguyen2014fixed,
+  author = {Nguyen, Thuong and Gupta, Sunil and Venkatesh, Svetha and Phung, Dinh},
+  title = {Fixed-lag particle filter for continuous context discovery using Indian Buffet Process},
+  booktitle = {IEEE International Conference on Pervasive Computing and Communications (PerCom)},
+  year = {2014},
+  pages = {20--28},
+  url = {http://ieeexplore.ieee.org/xpl/login.jsp?tp=&amp;arnumber=6813939}
+}
+</pre></td>
+</tr>
+<tr id="nguyenbayesian" class="entry">
+	<td>Nguyen T, Gupta SK, Venkatesh S and Phung DQ (2014), <i>"A Bayesian Nonparametric Framework for Activity Recognition Using Accelerometer Data"</i>, In 22nd International Conference on Pattern Recognition. , pp. 2017-2022.
+	<p class="infolinks">[<a href="javascript:toggleInfo('nguyenbayesian','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('nguyenbayesian','bibtex')">BibTeX</a>] [<a href="http://dx.doi.org/10.1109/ICPR.2014.352" target="_blank">DOI</a>] [<a href="http://dx.doi.org/10.1109/ICPR.2014.352" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_nguyenbayesian" class="abstract noshow">
+	<td><b>Abstract</b>: Monitoring daily physical activity of human plays an important role in preventing diseases as well as improving health. In this paper, we demonstrate a framework for monitoring the physical activity levels in daily life. We collect the data using accelerometer sensors in a realistic setting without any supervision. The ground truth of activities is provided by the participants themselves using an experience sampling application running on mobile phones. The original data is discretized by the hierarchical Dirichlet process (HDP) into different activity levels and the number of levels is inferred automatically. We validate the accuracy of the extracted patterns by using them for the multi-label classification of activities and demonstrate the high performances in various standard evaluation metrics. We further show that the extracted patterns are highly correlated to the daily routine of users.</td>
+</tr>
+<tr id="bib_nguyenbayesian" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{nguyenbayesian,
+  author = {Thuong Nguyen and Sunil Kumar Gupta and Svetha Venkatesh and Dinh Q. Phung},
+  title = {A Bayesian Nonparametric Framework for Activity Recognition Using Accelerometer Data},
+  booktitle = {22nd International Conference on Pattern Recognition},
+  year = {2014},
+  pages = {2017--2022},
+  url = {http://dx.doi.org/10.1109/ICPR.2014.352},
+  doi = {10.1109/ICPR.2014.352}
+}
+</pre></td>
+</tr>
+<tr id="nguyen2014mood" class="entry">
+	<td>Nguyen T, Phung D, Adams B and Venkatesh S (2014), <i>"Mood sensing from social media texts and its applications"</i>, Knowledge and information systems.  Vol. 39(3), pp. 667-702. Springer.
+	<p class="infolinks">[<a href="javascript:toggleInfo('nguyen2014mood','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('nguyen2014mood','bibtex')">BibTeX</a>] [<a href="http://prada-research.net/~dinh/uploads/Main/Publications/Nguyen_etal_13mood.pdf" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_nguyen2014mood" class="abstract noshow">
+	<td><b>Abstract</b>: We present a large-scale mood analysis in social media texts. We organise the paper in three parts: (1) addressing the problem of feature selection and classification of mood in blogosphere, (2) we extract global mood patterns at different level of aggregation from a large-scale data set of approximately 18 millions documents (3) and finally, we extract mood trajectory for an egocentric user and study how it can be used to detect subtle emotion signals in a user-centric manner, supporting discovery of hyper-groups of communities based on sentiment information. For mood classification, two feature sets proposed in psychology are used, showing that these features are efficient, do not require a training phase and yield classification results comparable to state of the art, supervised feature selection schemes; on mood patterns, empirical results for mood organisation in the blogosphere are provided, analogous to the structure of human emotion proposed independently in the psychology literature; and on community structure discovery, sentiment-based approach can yield useful insights into community formation.</td>
+</tr>
+<tr id="bib_nguyen2014mood" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{nguyen2014mood,
+  author = {Nguyen, Thin and Phung, Dinh and Adams, Brett and Venkatesh, Svetha},
+  title = {Mood sensing from social media texts and its applications},
+  journal = {Knowledge and information systems},
+  publisher = {Springer},
+  year = {2014},
+  volume = {39},
+  number = {3},
+  pages = {667--702},
+  url = {http://prada-research.net/~dinh/uploads/Main/Publications/Nguyen_etal_13mood.pdf}
+}
+</pre></td>
+</tr>
+<tr id="nguyenaffective" class="entry">
+	<td>Nguyen T, Phung DQ, Dao B, Venkatesh S and Berk M (2014), <i>"Affective and Content Analysis of Online Depression Communities"</i>, T. Affective Computing.  Vol. 5(3), pp. 217-226.
+	<p class="infolinks">[<a href="javascript:toggleInfo('nguyenaffective','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('nguyenaffective','bibtex')">BibTeX</a>] [<a href="http://dx.doi.org/10.1109/TAFFC.2014.2315623" target="_blank">DOI</a>] [<a href="http://dx.doi.org/10.1109/TAFFC.2014.2315623" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_nguyenaffective" class="abstract noshow">
+	<td><b>Abstract</b>: A large number of people use online communities to discuss mental health issues, thus offering opportunities for new understanding of these communities. This paper aims to study the characteristics of online depression communities (CLINICAL) in comparison with those joining other online communities (CONTROL). We use machine learning and statistical methods to discriminate online messages between depression and control communities using mood, psycholinguistic processes and content topics extracted from the posts generated by members of these communities. All aspects including mood, the written content and writing style are found to be significantly different between two types of communities. Sentiment analysis shows the clinical group have lower valence than people in the control group. For language styles and topics, statistical tests reject the hypothesis of equality on psycholinguistic processes and topics between two groups. We show good predictive validity in depression classification using topics and psycholinguistic clues as features. Clear discrimination between writing styles and contents, with good predictive power is an important step in understanding social media and its use in mental health.</td>
+</tr>
+<tr id="bib_nguyenaffective" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{nguyenaffective,
+  author = {Thin Nguyen and Dinh Q. Phung and Bo Dao and Svetha Venkatesh and Michael Berk},
+  title = {Affective and Content Analysis of Online Depression Communities},
+  journal = {T. Affective Computing},
+  year = {2014},
+  volume = {5},
+  number = {3},
+  pages = {217--226},
+  url = {http://dx.doi.org/10.1109/TAFFC.2014.2315623},
+  doi = {10.1109/TAFFC.2014.2315623}
+}
+</pre></td>
+</tr>
+<tr id="nguyenipoll" class="entry">
+	<td>Nguyen T, Phung DQ, Luo W, Tran T and Venkatesh S (2014), <i>"iPoll: Automatic Polling Using Online Search"</i>, In 15th International Conference on Web Information Systems Engineering. , pp. 266-275.
+	<p class="infolinks">[<a href="javascript:toggleInfo('nguyenipoll','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('nguyenipoll','bibtex')">BibTeX</a>] [<a href="http://dx.doi.org/10.1007/978-3-319-11749-2_21" target="_blank">DOI</a>] [<a href="http://dx.doi.org/10.1007/978-3-319-11749-2_21" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_nguyenipoll" class="abstract noshow">
+	<td><b>Abstract</b>: For years, opinion polls rely on data collected through telephone or person-to-person surveys. The process is costly, inconvenient, and slow. Recently online search data has emerged as potential proxies for the survey data. However considerable human involvement is still needed for the selection of search indices, a task that requires knowledge of both the target issue and how search terms are used by the online community. The robustness of such manually selected search indices can be questionable. In this paper, we propose an automatic polling system through a novel application of machine learning. In this system, the needs for examining, comparing, and selecting search indices have been eliminated through automatic generation of candidate search indices and intelligent combination of the indices. The results include a publicly accessible web application that provides real-time, robust, and accurate measurements of public opinions on several subjects of general interest.</td>
+</tr>
+<tr id="bib_nguyenipoll" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{nguyenipoll,
+  author = {Thin Nguyen and Dinh Q. Phung and Wei Luo and Truyen Tran and Svetha Venkatesh},
+  title = {iPoll: Automatic Polling Using Online Search},
+  booktitle = {15th International Conference on Web Information Systems Engineering},
+  year = {2014},
+  pages = {266--275},
+  url = {http://dx.doi.org/10.1007/978-3-319-11749-2_21},
+  doi = {10.1007/978-3-319-11749-2_21}
+}
+</pre></td>
+</tr>
+<tr id="nguyen2014bayesian" class="entry">
+	<td>Nguyen TV, Phung D, Nguyen X, Venkatesh S and Bui H (2014), <i>"Bayesian Nonparametric Multilevel Clustering with Group-Level Contexts"</i>, In Proceedings of The 31st International Conference on Machine Learning. , pp. 288-296.
+	<p class="infolinks">[<a href="javascript:toggleInfo('nguyen2014bayesian','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('nguyen2014bayesian','bibtex')">BibTeX</a>] [<a href="http://jmlr.org/proceedings/papers/v32/nguyenb14.html" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_nguyen2014bayesian" class="abstract noshow">
+	<td><b>Abstract</b>: We present a Bayesian non-parametric framework for multilevel clustering which utilizes group-level context information to simultaneously discover low-dimensional structures of the group contents and partitions groups into clusters. Using the Dirichlet process as the building block, our model constructs a product base-measure with a nested structure to accommodate content and context observations at multiple levels. The proposed model possesses properties that link the nested Dirichlet processes (nDP) and the Dirichlet process mixture models (DPM) in an interesting way: integrating out all contents results in the DPM over contexts, whereas integrating out group-specific contexts results in the nDP mixture over content variables. We provide a Polya-urn view of the model and an efficient collapsed Gibbs inference procedure. Extensive experiments on real-world datasets demonstrate the advantage of utilizing context information via our model in both text and image domains.</td>
+</tr>
+<tr id="bib_nguyen2014bayesian" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{nguyen2014bayesian,
+  author = {Nguyen, Tien Vu and Phung, Dinh and Nguyen, Xuanlong and Venkatesh, Svetha and Bui, Hung},
+  title = {Bayesian Nonparametric Multilevel Clustering with Group-Level Contexts},
+  booktitle = {Proceedings of The 31st International Conference on Machine Learning},
+  year = {2014},
+  pages = {288--296},
+  url = {http://jmlr.org/proceedings/papers/v32/nguyenb14.html}
+}
+</pre></td>
+</tr>
+<tr id="nguyen2014individualized" class="entry">
+	<td>Nguyen T-B, Lou W, Caelli T, Venkatesh S and Phung D (2014), <i>"Individualized arrhythmia detection with ECG signals from wearable devices"</i>, In International Conference on Data Science and Advanced Analytics (DSAA). , pp. 570-576.
+	<p class="infolinks">[<a href="javascript:toggleInfo('nguyen2014individualized','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('nguyen2014individualized','bibtex')">BibTeX</a>] [<a href="http://ieeexplore.ieee.org/xpl/login.jsp?tp=&arnumber=7058128" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_nguyen2014individualized" class="abstract noshow">
+	<td><b>Abstract</b>: Low cost pervasive electrocardiogram (ECG) monitors is changing how sinus arrhythmia are diagnosed among patients with mild symptoms. With the large amount of data generated from long-term monitoring, come new data science and analytical challenges. Although traditional rule-based detection algorithms still work on relatively short clinical quality ECG, they are not optimal for pervasive signals collected from wearable devices-they don't adapt to individual difference and assume accurate identification of ECG fiducial points. To overcome these short-comings of the rule-based methods, this paper introduces an arrhythmia detection approach for low quality pervasive ECG signals. To achieve the robustness needed, two techniques were applied. First, a set of ECG features with minimal reliance on fiducial point identification were selected. Next, the features were normalized using robust statistics to factors out baseline individual differences and clinically irrelevant temporal drift that is common in pervasive ECG. The proposed method was evaluated using pervasive ECG signals we collected, in combination with clinician validated ECG signals from Physiobank. Empirical evaluation confirms accuracy improvements of the proposed approach over the traditional clinical rules.</td>
+</tr>
+<tr id="bib_nguyen2014individualized" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{nguyen2014individualized,
+  author = {Nguyen, Thanh-Binh and Lou, Wei and Caelli, Terry and Venkatesh, Svetha and Phung, Dinh},
+  title = {Individualized arrhythmia detection with ECG signals from wearable devices},
+  booktitle = {International Conference on Data Science and Advanced Analytics (DSAA)},
+  year = {2014},
+  pages = {570--576},
+  url = {http://ieeexplore.ieee.org/xpl/login.jsp?tp=&amp;arnumber=7058128}
+}
+</pre></td>
+</tr>
+<tr id="nguyen2014unsupervised" class="entry">
+	<td>Nguyen T-B, Nguyen T, Luo W, Venkatesh S and Phung D (2014), <i>"Unsupervised inference of significant locations from WiFi data for understanding human dynamics"</i>, In 13th International Conference on Mobile and Ubiquitous Multimedia. , pp. 232-235.
+	<p class="infolinks">[<a href="javascript:toggleInfo('nguyen2014unsupervised','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('nguyen2014unsupervised','bibtex')">BibTeX</a>] [<a href="http://dl.acm.org/citation.cfm?id=2677997" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_nguyen2014unsupervised" class="abstract noshow">
+	<td><b>Abstract</b>: Motion and location activities are essential to understanding human dynamics. This paper presents a method for discovering significant locations and individuals' daily routines from WiFi data, a data source considered more suitable for analyzing human dynamics than GPS data. Our method determines significant locations by clustering access points in close proximity using the Affinity Propagation algorithm. We demonstrate the method on the MDC dataset that includes more than 30 million WiFi scans. The experimental results show a high clustering performance for most of the users. The discovered location trajectories revealed interesting mobility patterns of mobile phone users. The human dynamics of participants is reflected through the entropy of the location distributions which shows interesting correlation with the age and occupations of users. Quantitative results are presented to support our proposed approach.</td>
+</tr>
+<tr id="bib_nguyen2014unsupervised" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{nguyen2014unsupervised,
+  author = {Nguyen, Thanh-Binh and Nguyen, Thuong and Luo, Wei and Venkatesh, Svetha and Phung, Dinh},
+  title = {Unsupervised inference of significant locations from WiFi data for understanding human dynamics},
+  booktitle = {13th International Conference on Mobile and Ubiquitous Multimedia},
+  year = {2014},
+  pages = {232--235},
+  url = {http://dl.acm.org/citation.cfm?id=2677997}
+}
+</pre></td>
+</tr>
+<tr id="pham2014anomaly" class="entry">
+	<td>Pham D-S, Venkatesh S, Lazarescu M and Budhaditya S (2014), <i>"Anomaly detection in large-scale data stream networks"</i>, Data Mining and Knowledge Discovery.  Vol. 28(1), pp. 145-189. Springer.
+	<p class="infolinks">[<a href="javascript:toggleInfo('pham2014anomaly','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('pham2014anomaly','bibtex')">BibTeX</a>] [<a href="http://link.springer.com/article/10.1007/s10618-012-0297-3" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_pham2014anomaly" class="abstract noshow">
+	<td><b>Abstract</b>: This paper addresses the anomaly detection problem in large-scale data mining applications using residual subspace analysis. We are specifically concerned with situations where the full data cannot be practically obtained due to physical limitations such as low bandwidth, limited memory, storage, or computing power. Motivated by the recent compressed sensing (CS) theory, we suggest a framework wherein random projection can be used to obtained compressed data, addressing the scalability challenge. Our theoretical contribution shows that the spectral property of the CS data is approximately preserved under a such a projection and thus the performance of spectral-based methods for anomaly detection is almost equivalent to the case in which the raw data is completely available. Our second contribution is the construction of the framework to use this result and detect anomalies in the compressed data directly, thus circumventing the problems of data acquisition in large sensor networks. We have conducted extensive experiments to detect anomalies in network and surveillance applications on large datasets, including the benchmark PETS 2007 and 83 GB of real footage from three public train stations. Our results show that our proposed method is scalable, and importantly, its performance is comparable to conventional methods for anomaly detection when the complete data is available.</td>
+</tr>
+<tr id="bib_pham2014anomaly" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{pham2014anomaly,
+  author = {Pham, Duc-Son and Venkatesh, Svetha and Lazarescu, Mihai and Budhaditya, Saha},
+  title = {Anomaly detection in large-scale data stream networks},
+  journal = {Data Mining and Knowledge Discovery},
+  publisher = {Springer},
+  year = {2014},
+  volume = {28},
+  number = {1},
+  pages = {145--189},
+  url = {http://link.springer.com/article/10.1007/s10618-012-0297-3}
+}
+</pre></td>
+</tr>
+<tr id="phung2014learning" class="entry">
+	<td>Phung D, Nguyen T, Gupta S and Venkatesh S (2014), <i>"Learning latent activities from social signals with hierarchical Dirichlet processes"</i>, Handbook on Plan, Activity, and Intent Recognition. , pp. 149-174.
+	<p class="infolinks">[<a href="javascript:toggleInfo('phung2014learning','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('phung2014learning','bibtex')">BibTeX</a>] [<a href="http://prada-research.net/~svetha/papers/2014/Phung_etal_pair14.pdf" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_phung2014learning" class="abstract noshow">
+	<td><b>Abstract</b>: Understanding human activities is an important research topic, noticeably in assisted living and health monitoring. Beyond simple forms of activity (e.g., an RFID event of entering a building), learning latent activities that are more semantically interpretable, such as sitting at a desk, meeting with people or gathering with friends, remains a challenging problem. Supervised learning has been the typical modeling choice in the past. However, this requires labeled training data, is unable to predict never-seen-before activity and fails to adapt to the continuing growth of data over time. In this chapter, we explore the use of a Bayesian nonparametric method, in particular the Hierarchical Dirichlet Process, to infer latent activities from sensor data acquired in a pervasive setting. Our framework is unsupervised, requires no labeled data and is able to discover new activities as data grows. We present experiments on extracting movement and interaction activities from sociometric badge signals and show how to use them for detecting of sub-communities. Using the popular Reality Mining dataset, we further demonstrate the extraction of collocation activities and use them to automatically infer the structure of social subgroups.</td>
+</tr>
+<tr id="bib_phung2014learning" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{phung2014learning,
+  author = {Phung, Dinh and Nguyen, Thuong and Gupta, Sunil and Venkatesh, Svetha},
+  title = {Learning latent activities from social signals with hierarchical Dirichlet processes},
+  journal = {Handbook on Plan, Activity, and Intent Recognition},
+  year = {2014},
+  pages = {149--174},
+  url = {http://prada-research.net/~svetha/papers/2014/Phung_etal_pair14.pdf}
+}
+</pre></td>
+</tr>
+<tr id="rana2014intervention" class="entry">
+	<td>Rana S, Gupta SK, Phung D and Venkatesh S (2014), <i>"Intervention-Driven Predictive Framework for Modeling Healthcare Data"</i>, In Advances in Knowledge Discovery and Data Mining. , pp. 497-508. Springer.
+	<p class="infolinks">[<a href="javascript:toggleInfo('rana2014intervention','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('rana2014intervention','bibtex')">BibTeX</a>] [<a href="http://link.springer.com/chapter/10.1007%2F978-3-319-06608-0_41" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_rana2014intervention" class="abstract noshow">
+	<td><b>Abstract</b>: Assessing prognostic risk is crucial to clinical care, and critically dependent on both diagnosis and medical interventions. Current methods use this augmented information to build a single prediction rule. But this may not be expressive enough to capture differential effects of interventions on prognosis. To this end, we propose a supervised, Bayesian nonparametric framework that simultaneously discovers the latent intervention groups and builds a separate prediction rule for each intervention group. The prediction rule is learnt using diagnosis data through a Bayesian logistic regression. For inference, we develop an efficient collapsed Gibbs sampler. We demonstrate that our method outperforms baselines in predicting 30-day hospital readmission using two patient cohorts - Acute Myocardial Infarction and Pneumonia. The significance of this model is that it can be applied widely across a broad range of medical prognosis tasks.</td>
+</tr>
+<tr id="bib_rana2014intervention" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@incollection{rana2014intervention,
+  author = {Rana, Santu and Gupta, Sunil Kumar and Phung, Dinh and Venkatesh, Svetha},
+  title = {Intervention-Driven Predictive Framework for Modeling Healthcare Data},
+  booktitle = {Advances in Knowledge Discovery and Data Mining},
+  publisher = {Springer},
+  year = {2014},
+  pages = {497--508},
+  url = {http://link.springer.com/chapter/10.1007%2F978-3-319-06608-0_41}
+}
+</pre></td>
+</tr>
+<tr id="rana_et_al_bigdata14" class="entry">
+	<td>Rana S, Luo W, Tran T, Phung D, Venkatesh S and Harvey R (2014), <i>"HealthMap: A visual platform for patient suicide risk review"</i>, In Big Data. , pp. 42-43. Health Informatics Society of Australia.
+	<p class="infolinks">[<a href="javascript:toggleInfo('rana_et_al_bigdata14','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('rana_et_al_bigdata14','bibtex')">BibTeX</a>] [<a href="http://ceur-ws.org/Vol-1149/bd2014_venkatesh.pdf" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_rana_et_al_bigdata14" class="abstract noshow">
+	<td><b>Abstract</b>: Misjudging suicide risk can be fatal. Risk assessment is complicated by multiplicity of risk factors, none of which individually can reliably predict risk. This paper addresses the need for better clinical support, visualising risk factors scattered in raw electronic medical records. HealthMap is a visual tool that helps clinicians effectively examine patient histories during a suicide risk assessment. We characterise the information visualisation problems accompanying suicide risk assessments. A design driven by visualisation principles was implemented. The prototype was evaluated by clinicians and accepted into daily clinical work-flow.</td>
+</tr>
+<tr id="bib_rana_et_al_bigdata14" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{rana_et_al_bigdata14,
+  author = {Santu Rana and Wei Luo and Truyen Tran and Dinh Phung and Svetha Venkatesh and Richard Harvey},
+  title = {HealthMap: A visual platform for patient suicide risk review},
+  booktitle = {Big Data},
+  publisher = {Health Informatics Society of Australia},
+  year = {2014},
+  pages = {42-43},
+  url = {http://ceur-ws.org/Vol-1149/bd2014_venkatesh.pdf}
+}
+</pre></td>
+</tr>
+<tr id="rana2014predicting" class="entry">
+	<td>Rana S, Tran T, Luo W, Phung D, Kennedy R and Venkatesh S (2014), <i>"Predicting unplanned readmission after Myocardial Infarction from Routinely Collected Administrative Hospital Data"</i>, Australian Health Review. , pp. 377-382. CSIRO.
+	<p class="infolinks">[<a href="javascript:toggleInfo('rana2014predicting','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('rana2014predicting','bibtex')">BibTeX</a>] [<a href="http://www.publish.csiro.au/?paper=AH14059" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_rana2014predicting" class="abstract noshow">
+	<td><b>Abstract</b>: This paper presents a way to predict readmissions following myocardial infarction using routinely collected administrative data. The model performed better than the recently described HOSPITAL score and a model derived from Elixhauser comorbidities. Moreover, the model uses only data generally available in most hospitals.</td>
+</tr>
+<tr id="bib_rana2014predicting" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{rana2014predicting,
+  author = {Rana, Santu and Tran, Truyen and Luo, Wei and Phung, Dinh and Kennedy, Richard and Venkatesh, Svetha},
+  title = {Predicting unplanned readmission after Myocardial Infarction from Routinely Collected Administrative Hospital Data},
+  journal = {Australian Health Review},
+  publisher = {CSIRO},
+  year = {2014},
+  pages = {377--382},
+  url = {http://www.publish.csiro.au/?paper=AH14059}
+}
+</pre></td>
+</tr>
+<tr id="tran2014framework" class="entry">
+	<td>Tran T, Luo W, Phung D, Gupta S, Rana S, Kennedy RL, Larkins A and Venkatesh S (2014), <i>"A framework for feature extraction from hospital medical data with applications in risk prediction"</i>, BMC bioinformatics.  Vol. 15(1), pp. 425. BioMed Central.
+	<p class="infolinks">[<a href="javascript:toggleInfo('tran2014framework','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('tran2014framework','bibtex')">BibTeX</a>] [<a href="http://dx.doi.org/10.1186/s12859-014-0425-8" target="_blank">DOI</a>] [<a href="https://bmcbioinformatics.biomedcentral.com/articles/10.1186/s12859-014-0425-8" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_tran2014framework" class="abstract noshow">
+	<td><b>Abstract</b>: Background<br>Feature engineering is a time consuming component of predictive modeling. We propose a versatile platform to automatically extract features for risk prediction, based on a pre-defined and extensible entity schema. The extraction is independent of disease type or risk prediction task. We contrast auto-extracted features to baselines generated from the Elixhauser comorbidities.<p>Results<br>Hospital medical records was transformed to event sequences, to which filters were applied to extract feature sets capturing diversity in temporal scales and data types. The features were evaluated on a readmission prediction task, comparing with baseline feature sets generated from the Elixhauser comorbidities. The prediction model was through logistic regression with elastic net regularization. Predictions horizons of 1, 2, 3, 6, 12 months were considered for four diverse diseases: diabetes, COPD, mental disorders and pneumonia, with derivation and validation cohorts defined on non-overlapping data-collection periods.<p>For unplanned readmissions, auto-extracted feature set using socio-demographic information and medical records, outperformed baselines derived from the socio-demographic information and Elixhauser comorbidities, over 20 settings (5 prediction horizons over 4 diseases). In particular over 30-day prediction, the AUCs are: COPD—baseline: 0.60 (95% CI: 0.57, 0.63), auto-extracted: 0.67 (0.64, 0.70); diabetes—baseline: 0.60 (0.58, 0.63), auto-extracted: 0.67 (0.64, 0.69); mental disorders—baseline: 0.57 (0.54, 0.60), auto-extracted: 0.69 (0.64,0.70); pneumonia—baseline: 0.61 (0.59, 0.63), auto-extracted: 0.70 (0.67, 0.72).<p>Conclusions<br>The advantages of auto-extracted standard features from complex medical records, in a disease and task agnostic manner were demonstrated. Auto-extracted features have good predictive power over multiple time horizons. Such feature sets have potential to form the foundation of complex automated analytic tasks.</td>
+</tr>
+<tr id="bib_tran2014framework" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{tran2014framework,
+  author = {Tran, Truyen and Luo, Wei and Phung, Dinh and Gupta, Sunil and Rana, Santu and Kennedy, Richard Lee and Larkins, Ann and Venkatesh, Svetha},
+  title = {A framework for feature extraction from hospital medical data with applications in risk prediction},
+  journal = {BMC bioinformatics},
+  publisher = {BioMed Central},
+  year = {2014},
+  volume = {15},
+  number = {1},
+  pages = {425},
+  url = {https://bmcbioinformatics.biomedcentral.com/articles/10.1186/s12859-014-0425-8},
+  doi = {10.1186/s12859-014-0425-8}
+}
+</pre></td>
+</tr>
+<tr id="tran2014risk" class="entry">
+	<td>Tran T, Luo W, Phung D, Harvey R, Berk M, Kennedy RL and Venkatesh S (2014), <i>"Risk stratification using data from electronic medical records better predicts suicide risks than clinician assessments"</i>, BMC psychiatry.  Vol. 14(1), pp. 76. BioMed Central Ltd.
+	<p class="infolinks">[<a href="javascript:toggleInfo('tran2014risk','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('tran2014risk','bibtex')">BibTeX</a>] [<a href="http://bmcpsychiatry.biomedcentral.com/articles/10.1186/1471-244X-14-76" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_tran2014risk" class="abstract noshow">
+	<td><b>Abstract</b>: To date, our ability to accurately identify patients at high risk from suicidal behaviour, and thus to target interventions, has been fairly limited. This study examined a large pool of factors that are potentially associated with suicide risk from the comprehensive electronic medical record (EMR) and to derive a predictive model for 1–6 month risk.<br>7,399 patients undergoing suicide risk assessment were followed up for 180 days. The dataset was divided into a derivation and validation cohorts of 4,911 and 2,488 respectively. Clinicians used an 18-point checklist of known risk factors to divide patients into low, medium, or high risk. Their predictive ability was compared with a risk stratification model derived from the EMR data. The model was based on the continuation-ratio ordinal regression method coupled with lasso (which stands for least absolute shrinkage and selection operator).<br>In the year prior to suicide assessment, 66.8% of patients attended the emergency department (ED) and 41.8% had at least one hospital admission. Administrative and demographic data, along with information on prior self-harm episodes, as well as mental and physical health diagnoses were predictive of high-risk suicidal behaviour. Clinicians using the 18-point checklist were relatively poor in predicting patients at high-risk in 3 months (AUC 0.58, 95% CIs: 0.50 – 0.66). The model derived EMR was superior (AUC 0.79, 95% CIs: 0.72 – 0.84). At specificity of 0.72 (95% CIs: 0.70-0.73) the EMR model had sensitivity of 0.70 (95% CIs: 0.56-0.83).<br>Predictive models applied to data from the EMR could improve risk stratification of patients presenting with potential suicidal behaviour. The predictive factors include known risks for suicide, but also other information relating to general health and health service utilisation.</td>
+</tr>
+<tr id="bib_tran2014risk" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{tran2014risk,
+  author = {Tran, Truyen and Luo, Wei and Phung, Dinh and Harvey, Richard and Berk, Michael and Kennedy, Richard Lee and Venkatesh, Svetha},
+  title = {Risk stratification using data from electronic medical records better predicts suicide risks than clinician assessments},
+  journal = {BMC psychiatry},
+  publisher = {BioMed Central Ltd},
+  year = {2014},
+  volume = {14},
+  number = {1},
+  pages = {76},
+  url = {http://bmcpsychiatry.biomedcentral.com/articles/10.1186/1471-244X-14-76}
+}
+</pre></td>
+</tr>
+<tr id="tran2014stabilized" class="entry">
+	<td>Tran T, Phung D, Luo W and Venkatesh S (2014), <i>"Stabilized sparse ordinal regression for medical risk stratification"</i>, Knowledge and Information Systems. , pp. 1-28. Springer.
+	<p class="infolinks">[<a href="javascript:toggleInfo('tran2014stabilized','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('tran2014stabilized','bibtex')">BibTeX</a>] [<a href="http://arxiv.org/pdf/1407.6084.pdf" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_tran2014stabilized" class="abstract noshow">
+	<td><b>Abstract</b>: The recent wide adoption of electronic medical records (EMRs) presents great opportunities and challenges for data mining. The EMR data are largely temporal, often noisy, irregular and high dimensional. This paper constructs a novel ordinal regression framework for predicting medical risk stratification from EMR. First, a conceptual view of EMR as a temporal image is constructed to extract a diverse set of features. Second, ordinal modeling is applied for predicting cumulative or progressive risk. The challenges are building a transparent predictive model that works with a large number of weakly predictive features, and at the same time, is stable against resampling variations. Our solution employs sparsity methods that are stabilized through domain-specific feature interaction networks. We introduces two indices that measure the model stability against data resampling. Feature networks are used to generate two multivariate Gaussian priors with sparse precision matrices (the Laplacian and Random Walk). We apply the framework on a large short-term suicide risk prediction problem and demonstrate that our methods outperform clinicians to a large margin, discover suicide risk factors that conform with mental health knowledge, and produce models with enhanced stability.</td>
+</tr>
+<tr id="bib_tran2014stabilized" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{tran2014stabilized,
+  author = {Tran, Truyen and Phung, Dinh and Luo, Wei and Venkatesh, Svetha},
+  title = {Stabilized sparse ordinal regression for medical risk stratification},
+  journal = {Knowledge and Information Systems},
+  publisher = {Springer},
+  year = {2014},
+  pages = {1--28},
+  url = {http://arxiv.org/pdf/1407.6084.pdf}
+}
+</pre></td>
+</tr>
+<tr id="vellanki2014nonparametric" class="entry">
+	<td>Vellanki P, Duong T, Venkatesh S and Phung D (2014), <i>"Nonparametric Discovery of Learning Patterns and Autism Subgroups from Therapeutic Data"</i>, In 22nd International Conference on Pattern Recognition. , pp. 1828-1833.
+	<p class="infolinks">[<a href="javascript:toggleInfo('vellanki2014nonparametric','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('vellanki2014nonparametric','bibtex')">BibTeX</a>] [<a href="http://ieeexplore.ieee.org/xpl/login.jsp?tp=&arnumber=6977032" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_vellanki2014nonparametric" class="abstract noshow">
+	<td><b>Abstract</b>: Autism Spectrum Disorder (ASD) is growing at a staggering rate, but, little is known about the cause of this condition. Inferring learning patterns from therapeutic performance data, and subsequently clustering ASD children into subgroups, is important to understand this domain, and more importantly to inform evidence-based intervention. However, this data-driven task was difficult in the past due to insufficiency of data to perform reliable analysis. For the first time, using data from a recent application for early intervention in autism (TOBY Play pad), whose download count is now exceeding 4500, we present in this paper the automatic discovery of learning patterns across 32 skills in sensory, imitation and language. We use unsupervised learning methods for this task, but a notorious problem with existing methods is the correct specification of number of patterns in advance, which in our case is even more difficult due to complexity of the data. To this end, we appeal to recent Bayesian nonparametric methods, in particular the use of Bayesian Nonparametric Factor Analysis. This model uses Indian Buffet Process (IBP) as prior on a binary matrix of infinite columns to allocate groups of intervention skills to children. The optimal number of learning patterns as well as subgroup assignments are inferred automatically from data. Our experimental results follow an exploratory approach, present different newly discovered learning patterns. To provide quantitative results, we also report the clustering evaluation against K-means and Nonnegative matrix factorization (NMF). In addition to the novelty of this new problem, we were able to demonstrate the suitability of Bayesian nonparametric models over parametric rivals.</td>
+</tr>
+<tr id="bib_vellanki2014nonparametric" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{vellanki2014nonparametric,
+  author = {Vellanki, Pratibha and Duong, Thi and Venkatesh, Svetha and Phung, Dinh},
+  title = {Nonparametric Discovery of Learning Patterns and Autism Subgroups from Therapeutic Data},
+  booktitle = {22nd International Conference on Pattern Recognition},
+  year = {2014},
+  pages = {1828--1833},
+  url = {http://ieeexplore.ieee.org/xpl/login.jsp?tp=&amp;arnumber=6977032}
+}
+</pre></td>
+</tr>
+</tbody>
+</table>
+<footer>
+ <small>Created by <a href="http://jabref.sourceforge.net">JabRef</a> on 04/12/2017.</small>
+</footer>
+<!-- file generated by JabRef -->
+</body>
+</html>

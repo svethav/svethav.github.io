@@ -1,0 +1,623 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<title>JabRef references</title>
+<meta http-equiv="Content-Type" content="text/html; charset=windows-1252">
+<script type="text/javascript">
+<!--
+// QuickSearch script for JabRef HTML export 
+// Version: 3.0
+//
+// Copyright (c) 2006-2011, Mark Schenk
+//
+// This software is distributed under a Creative Commons Attribution 3.0 License
+// http://creativecommons.org/licenses/by/3.0/
+//
+// Features:
+// - intuitive find-as-you-type searching
+//    ~ case insensitive
+//    ~ ignore diacritics (optional)
+//
+// - search with/without Regular Expressions
+// - match BibTeX key
+//
+
+// Search settings
+var searchAbstract = true;	// search in abstract
+var searchReview = true;	// search in review
+
+var noSquiggles = true; 	// ignore diacritics when searching
+var searchRegExp = false; 	// enable RegExp searches
+
+
+if (window.addEventListener) {
+	window.addEventListener("load",initSearch,false); }
+else if (window.attachEvent) {
+	window.attachEvent("onload", initSearch); }
+
+function initSearch() {
+	// check for quick search table and searchfield
+	if (!document.getElementById('qs_table')||!document.getElementById('quicksearch')) { return; }
+
+	// load all the rows and sort into arrays
+	loadTableData();
+	
+	//find the query field
+	qsfield = document.getElementById('qs_field');
+
+	// previous search term; used for speed optimisation
+	prevSearch = '';
+
+	//find statistics location
+	stats = document.getElementById('stat');
+	setStatistics(-1);
+	
+	// set up preferences
+	initPreferences();
+
+	// shows the searchfield
+	document.getElementById('quicksearch').style.display = 'block';
+	document.getElementById('qs_field').onkeyup = quickSearch;
+}
+
+function loadTableData() {
+	// find table and appropriate rows
+	searchTable = document.getElementById('qs_table');
+	var allRows = searchTable.getElementsByTagName('tbody')[0].getElementsByTagName('tr');
+
+	// split all rows into entryRows and infoRows (e.g. abstract, review, bibtex)
+	entryRows = new Array(); infoRows = new Array(); absRows = new Array(); revRows = new Array();
+
+	// get data from each row
+	entryRowsData = new Array(); absRowsData = new Array(); revRowsData = new Array(); 
+	
+	BibTeXKeys = new Array();
+	
+	for (var i=0, k=0, j=0; i<allRows.length;i++) {
+		if (allRows[i].className.match(/entry/)) {
+			entryRows[j] = allRows[i];
+			entryRowsData[j] = stripDiacritics(getTextContent(allRows[i]));
+			allRows[i].id ? BibTeXKeys[j] = allRows[i].id : allRows[i].id = 'autokey_'+j;
+			j ++;
+		} else {
+			infoRows[k++] = allRows[i];
+			// check for abstract/review
+			if (allRows[i].className.match(/abstract/)) {
+				absRows.push(allRows[i]);
+				absRowsData[j-1] = stripDiacritics(getTextContent(allRows[i]));
+			} else if (allRows[i].className.match(/review/)) {
+				revRows.push(allRows[i]);
+				revRowsData[j-1] = stripDiacritics(getTextContent(allRows[i]));
+			}
+		}
+	}
+	//number of entries and rows
+	numEntries = entryRows.length;
+	numInfo = infoRows.length;
+	numAbs = absRows.length;
+	numRev = revRows.length;
+}
+
+function quickSearch(){
+	
+	tInput = qsfield;
+
+	if (tInput.value.length == 0) {
+		showAll();
+		setStatistics(-1);
+		qsfield.className = '';
+		return;
+	} else {
+		t = stripDiacritics(tInput.value);
+
+		if(!searchRegExp) { t = escapeRegExp(t); }
+			
+		// only search for valid RegExp
+		try {
+			textRegExp = new RegExp(t,"i");
+			closeAllInfo();
+			qsfield.className = '';
+		}
+			catch(err) {
+			prevSearch = tInput.value;
+			qsfield.className = 'invalidsearch';
+			return;
+		}
+	}
+	
+	// count number of hits
+	var hits = 0;
+
+	// start looping through all entry rows
+	for (var i = 0; cRow = entryRows[i]; i++){
+
+		// only show search the cells if it isn't already hidden OR if the search term is getting shorter, then search all
+		if(cRow.className.indexOf('noshow')==-1 || tInput.value.length <= prevSearch.length){
+			var found = false; 
+
+			if (entryRowsData[i].search(textRegExp) != -1 || BibTeXKeys[i].search(textRegExp) != -1){ 
+				found = true;
+			} else {
+				if(searchAbstract && absRowsData[i]!=undefined) {
+					if (absRowsData[i].search(textRegExp) != -1){ found=true; } 
+				}
+				if(searchReview && revRowsData[i]!=undefined) {
+					if (revRowsData[i].search(textRegExp) != -1){ found=true; } 
+				}
+			}
+			
+			if (found){
+				cRow.className = 'entry show';
+				hits++;
+			} else {
+				cRow.className = 'entry noshow';
+			}
+		}
+	}
+
+	// update statistics
+	setStatistics(hits)
+	
+	// set previous search value
+	prevSearch = tInput.value;
+}
+
+
+// Strip Diacritics from text
+// http://stackoverflow.com/questions/990904/javascript-remove-accents-in-strings
+
+// String containing replacement characters for stripping accents 
+var stripstring = 
+    'AAAAAAACEEEEIIII'+
+    'DNOOOOO.OUUUUY..'+
+    'aaaaaaaceeeeiiii'+
+    'dnooooo.ouuuuy.y'+
+    'AaAaAaCcCcCcCcDd'+
+    'DdEeEeEeEeEeGgGg'+
+    'GgGgHhHhIiIiIiIi'+
+    'IiIiJjKkkLlLlLlL'+
+    'lJlNnNnNnnNnOoOo'+
+    'OoOoRrRrRrSsSsSs'+
+    'SsTtTtTtUuUuUuUu'+
+    'UuUuWwYyYZzZzZz.';
+
+function stripDiacritics(str){
+
+    if(noSquiggles==false){
+        return str;
+    }
+
+    var answer='';
+    for(var i=0;i<str.length;i++){
+        var ch=str[i];
+        var chindex=ch.charCodeAt(0)-192;   // Index of character code in the strip string
+        if(chindex>=0 && chindex<stripstring.length){
+            // Character is within our table, so we can strip the accent...
+            var outch=stripstring.charAt(chindex);
+            // ...unless it was shown as a '.'
+            if(outch!='.')ch=outch;
+        }
+        answer+=ch;
+    }
+    return answer;
+}
+
+// http://stackoverflow.com/questions/3446170/escape-string-for-use-in-javascript-regex
+// NOTE: must escape every \ in the export code because of the JabRef Export...
+function escapeRegExp(str) {
+  return str.replace(/[-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, "\\$&");
+}
+
+function toggleInfo(articleid,info) {
+
+	var entry = document.getElementById(articleid);
+	var abs = document.getElementById('abs_'+articleid);
+	var rev = document.getElementById('rev_'+articleid);
+	var bib = document.getElementById('bib_'+articleid);
+	
+	if (abs && info == 'abstract') {
+		abs.className.indexOf('noshow') == -1?abs.className = 'abstract noshow':abs.className = 'abstract show';
+	} else if (rev && info == 'review') {
+		rev.className.indexOf('noshow') == -1?rev.className = 'review noshow':rev.className = 'review show';
+	} else if (bib && info == 'bibtex') {
+		bib.className.indexOf('noshow') == -1?bib.className = 'bibtex noshow':bib.className = 'bibtex show';
+	} else { 
+		return;
+	}
+
+	// check if one or the other is available
+	var revshow; var absshow; var bibshow;
+	(abs && abs.className.indexOf('noshow') == -1)? absshow = true: absshow = false;
+	(rev && rev.className.indexOf('noshow') == -1)? revshow = true: revshow = false;	
+	(bib && bib.className.indexOf('noshow') == -1)? bibshow = true: bibshow = false;
+	
+	// highlight original entry
+	if(entry) {
+		if (revshow || absshow || bibshow) {
+		entry.className = 'entry highlight show';
+		} else {
+		entry.className = 'entry show';
+		}
+	}
+	
+	// When there's a combination of abstract/review/bibtex showing, need to add class for correct styling
+	if(absshow) {
+		(revshow||bibshow)?abs.className = 'abstract nextshow':abs.className = 'abstract';
+	} 
+	if (revshow) {
+		bibshow?rev.className = 'review nextshow': rev.className = 'review';
+	}	
+	
+}
+
+function setStatistics (hits) {
+	if(hits < 0) { hits=numEntries; }
+	if(stats) { stats.firstChild.data = hits + '/' + numEntries}
+}
+
+function getTextContent(node) {
+	// Function written by Arve Bersvendsen
+	// http://www.virtuelvis.com
+	
+	if (node.nodeType == 3) {
+	return node.nodeValue;
+	} // text node
+	if (node.nodeType == 1 && node.className != "infolinks") { // element node
+	var text = [];
+	for (var chld = node.firstChild;chld;chld=chld.nextSibling) {
+		text.push(getTextContent(chld));
+	}
+	return text.join("");
+	} return ""; // some other node, won't contain text nodes.
+}
+
+function showAll(){
+	closeAllInfo();
+	for (var i = 0; i < numEntries; i++){ entryRows[i].className = 'entry show'; }
+}
+
+function closeAllInfo(){
+	for (var i=0; i < numInfo; i++){
+		if (infoRows[i].className.indexOf('noshow') ==-1) {
+			infoRows[i].className = infoRows[i].className + ' noshow';
+		}
+	}
+}
+
+function clearQS() {
+	qsfield.value = '';
+	showAll();
+}
+
+function redoQS(){
+	showAll();
+	quickSearch(qsfield);
+}
+
+function updateSetting(obj){
+	var option = obj.id;
+	var checked = obj.value;
+
+	switch(option)
+	 {
+	 case "opt_searchAbs":
+	   searchAbstract=!searchAbstract;
+	   redoQS();
+	   break;
+	 case "opt_searchRev":
+	   searchReview=!searchReview;
+	   redoQS();
+	   break;
+	 case "opt_useRegExp":
+	   searchRegExp=!searchRegExp;
+	   redoQS();
+	   break;
+	 case "opt_noAccents":
+	   noSquiggles=!noSquiggles;
+	   loadTableData();
+	   redoQS();
+	   break;
+	 }
+}
+
+function initPreferences(){
+	if(searchAbstract){document.getElementById("opt_searchAbs").checked = true;}
+	if(searchReview){document.getElementById("opt_searchRev").checked = true;}
+	if(noSquiggles){document.getElementById("opt_noAccents").checked = true;}
+	if(searchRegExp){document.getElementById("opt_useRegExp").checked = true;}
+	
+	if(numAbs==0) {document.getElementById("opt_searchAbs").parentNode.style.display = 'none';}
+	if(numRev==0) {document.getElementById("opt_searchRev").parentNode.style.display = 'none';}	
+}
+
+function toggleSettings(){
+	var togglebutton = document.getElementById('showsettings');
+	var settings = document.getElementById('settings');
+	
+	if(settings.className == "hidden"){
+		settings.className = "show";
+		togglebutton.innerText = "close settings";
+		togglebutton.textContent = "close settings";
+	}else{
+		settings.className = "hidden";
+		togglebutton.innerText = "settings...";		
+		togglebutton.textContent = "settings...";
+	}
+}
+
+-->
+</script>
+<style type="text/css">
+body { background-color: white; font-family: Arial, sans-serif; font-size: 13px; line-height: 1.2; padding: 1em; color: #2E2E2E; width: 50em; margin: auto auto; }
+
+form#quicksearch { width: auto; border-style: solid; border-color: gray; border-width: 1px 0px; padding: 0.7em 0.5em; display:none; position:relative; }
+span#searchstat {padding-left: 1em;}
+
+div#settings { margin-top:0.7em; /* border-bottom: 1px transparent solid; background-color: #efefef; border: 1px grey solid; */ }
+div#settings ul {margin: 0; padding: 0; }
+div#settings li {margin: 0; padding: 0 1em 0 0; display: inline; list-style: none; }
+div#settings li + li { border-left: 2px #efefef solid; padding-left: 0.5em;}
+div#settings input { margin-bottom: 0px;}
+
+div#settings.hidden {display:none;}
+
+#showsettings { border: 1px grey solid; padding: 0 0.5em; float:right; line-height: 1.6em; text-align: right; }
+#showsettings:hover { cursor: pointer; }
+
+.invalidsearch { background-color: red; }
+input[type="button"] { background-color: #efefef; border: 1px #2E2E2E solid;}
+
+table { border: 1px gray none; width: 100%; empty-cells: show; border-spacing: 0em 0.1em; margin: 1em 0em; }
+th, td { border: none; padding: 0.5em; vertical-align: top; text-align: justify; }
+
+td a { color: navy; text-decoration: none; }
+td a:hover  { text-decoration: underline; }
+
+tr.noshow { display: none;}
+tr.highlight td { background-color: #EFEFEF; border-top: 2px #2E2E2E solid; font-weight: bold; }
+tr.abstract td, tr.review td, tr.bibtex td { background-color: #EFEFEF; text-align: justify; border-bottom: 2px #2E2E2E solid; }
+tr.nextshow td { border-bottom-style: none; }
+
+tr.bibtex pre { width: 100%; overflow: auto; white-space: pre-wrap;}
+p.infolinks { margin: 0.3em 0em 0em 0em; padding: 0px; }
+
+@media print {
+	p.infolinks, #qs_settings, #quicksearch, t.bibtex { display: none !important; }
+	tr { page-break-inside: avoid; }
+}
+</style>
+</head>
+<body>
+
+<form action="" id="quicksearch">
+<input type="text" id="qs_field" autocomplete="off" placeholder="Type to search..." /> <input type="button" onclick="clearQS()" value="clear" />
+<span id="searchstat">Matching entries: <span id="stat">0</span></span>
+<div id="showsettings" onclick="toggleSettings()">settings...</div>
+<div id="settings" class="hidden">
+<ul>
+<li><input type="checkbox" class="search_setting" id="opt_searchAbs" onchange="updateSetting(this)"><label for="opt_searchAbs"> include abstract</label></li>
+<li><input type="checkbox" class="search_setting" id="opt_searchRev" onchange="updateSetting(this)"><label for="opt_searchRev"> include review</label></li>
+<li><input type="checkbox" class="search_setting" id="opt_useRegExp" onchange="updateSetting(this)"><label for="opt_useRegExp"> use RegExp</label></li>
+<li><input type="checkbox" class="search_setting" id="opt_noAccents" onchange="updateSetting(this)"><label for="opt_noAccents"> ignore accents</label></li>
+</ul>
+</div>
+</form>
+<table id="qs_table" border="1">
+<tbody>
+<tr id="dai2017stable" class="entry">
+	<td>Dai Nguyen T, Gupta S, Rana S and Venkatesh S (2017), <i>"Stable Bayesian Optimization"</i>, In Pacific-Asia Conference on Knowledge Discovery and Data Mining. , pp. 578-591.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('dai2017stable','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_dai2017stable" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{dai2017stable,
+  author = {Dai Nguyen, Thanh and Gupta, Sunil and Rana, Santu and Venkatesh, Svetha},
+  title = {Stable Bayesian Optimization},
+  booktitle = {Pacific-Asia Conference on Knowledge Discovery and Data Mining},
+  year = {2017},
+  pages = {578--591}
+}
+</pre></td>
+</tr>
+<tr id="li2017rapid" class="entry">
+	<td>Li C, de Celis Leal DR, Rana S, Gupta S, Sutti A, Greenhill S, Slezak T, Height M and Venkatesh S (2017), <i>"Rapid Bayesian optimisation for synthesis of short polymer fiber materials"</i>, Scientific reports.  Vol. 7(1), pp. 5683. Nature Publishing Group.
+	<p class="infolinks">[<a href="javascript:toggleInfo('li2017rapid','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('li2017rapid','bibtex')">BibTeX</a>] [<a href="http://dx.doi.org/10.1038/s41598-017-05723-0" target="_blank">DOI</a>] [<a href="https://www.nature.com/articles/s41598-017-05723-0" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_li2017rapid" class="abstract noshow">
+	<td><b>Abstract</b>: The discovery of processes for the synthesis of new materials involves many decisions about process design, operation, and material properties. Experimentation is crucial but as complexity increases, exploration of variables can become impractical using traditional combinatorial approaches. We describe an iterative method which uses machine learning to optimise process development, incorporating multiple qualitative and quantitative objectives. We demonstrate the method with a novel fluid processing platform for synthesis of short polymer fibers, and show how the synthesis process can be efficiently directed to achieve material and process objectives.</td>
+</tr>
+<tr id="bib_li2017rapid" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{li2017rapid,
+  author = {Li, Cheng and de Celis Leal, David Rubin and Rana, Santu and Gupta, Sunil and Sutti, Alessandra and Greenhill, Stewart and Slezak, Teo and Height, Murray and Venkatesh, Svetha},
+  title = {Rapid Bayesian optimisation for synthesis of short polymer fiber materials},
+  journal = {Scientific reports},
+  publisher = {Nature Publishing Group},
+  year = {2017},
+  volume = {7},
+  number = {1},
+  pages = {5683},
+  url = {https://www.nature.com/articles/s41598-017-05723-0},
+  doi = {10.1038/s41598-017-05723-0}
+}
+</pre></td>
+</tr>
+<tr id="cheng2017high" class="entry">
+	<td>Li C, Gupta S, Rana S, Nugyen V, Venkatesh S and Alistair S (2017), <i>"High Dimensional Bayesian Optimization Using Dropout"</i>, In International Joint Conference on Artificial Intelligence. , pp. to appear.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('cheng2017high','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_cheng2017high" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{cheng2017high,
+  author = {Li, Cheng and Gupta, Sunil and Rana, Santu and Nugyen, Vu and Venkatesh, Svetha and Shilton Alistair},
+  title = {High Dimensional Bayesian Optimization Using Dropout},
+  booktitle = {International Joint Conference on Artificial Intelligence},
+  year = {2017},
+  pages = {to appear}
+}
+</pre></td>
+</tr>
+<tr id="nguyen2017mathtt" class="entry">
+	<td>Nguyen P, Tran T, Wickramasinghe N and Venkatesh S (2017), <i>"Deepr: A Convolutional Net for Medical Records"</i>, IEEE journal of biomedical and health informatics.  Vol. 21(1), pp. 22-30. IEEE.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('nguyen2017mathtt','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_nguyen2017mathtt" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{nguyen2017mathtt,
+  author = {Nguyen, Phuoc and Tran, Truyen and Wickramasinghe, Nilmini and Venkatesh, Svetha},
+  title = {Deepr: A Convolutional Net for Medical Records},
+  journal = {IEEE journal of biomedical and health informatics},
+  publisher = {IEEE},
+  year = {2017},
+  volume = {21},
+  number = {1},
+  pages = {22--30}
+}
+</pre></td>
+</tr>
+<tr id="pham2017predicting" class="entry">
+	<td>Pham T, Tran T, Phung D and Venkatesh S (2017), <i>"Predicting healthcare trajectories from medical records: A deep learning approach"</i>, Journal of biomedical informatics.  Vol. 69, pp. 218-229. Elsevier.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('pham2017predicting','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_pham2017predicting" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{pham2017predicting,
+  author = {Pham, Trang and Tran, Truyen and Phung, Dinh and Venkatesh, Svetha},
+  title = {Predicting healthcare trajectories from medical records: A deep learning approach},
+  journal = {Journal of biomedical informatics},
+  publisher = {Elsevier},
+  year = {2017},
+  volume = {69},
+  pages = {218--229}
+}
+</pre></td>
+</tr>
+<tr id="pham2017column" class="entry">
+	<td>Pham T, Tran T, Phung DQ and Venkatesh S (2017), <i>"Column Networks for Collective Classification"</i>, In AAAI. , pp. 2485-2491.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('pham2017column','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_pham2017column" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{pham2017column,
+  author = {Pham, Trang and Tran, Truyen and Phung, Dinh Q and Venkatesh, Svetha},
+  title = {Column Networks for Collective Classification},
+  booktitle = {AAAI},
+  year = {2017},
+  pages = {2485--2491}
+}
+</pre></td>
+</tr>
+<tr id="rana2017high" class="entry">
+	<td>Rana S, Li C, Gupta S, Nguyen V and Venkatesh S (2017), <i>"High dimensional bayesian optimization with elastic gaussian process"</i>, In International Conference on Machine Learning. , pp. 2883-2891.
+	<p class="infolinks">[<a href="javascript:toggleInfo('rana2017high','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('rana2017high','bibtex')">BibTeX</a>] [<a href="http://proceedings.mlr.press/v70/rana17a/rana17a.pdf" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_rana2017high" class="abstract noshow">
+	<td><b>Abstract</b>: Bayesian optimization is an efficient way to optimize expensive black-box functions such as designing a new product with highest quality or tuning hyperparameter of a machine learning algorithm. However, it has a serious limitation when the parameter space is high-dimensional as Bayesian optimization crucially depends on solving a global optimization of a surrogate utility function in the same sized dimensions. The surrogate utility function, known commonly as acquisition function is a continuous function but can be extremely sharp at high dimension - having only a few peaks marooned in a large terrain of almost flat surface. Global optimization algorithms such as DIRECT are infeasible at higher dimensions and gradient-dependent methods cannot move if initialized in the flat terrain. We propose an algorithm that enables local gradient-dependent algorithms to move through the flat terrain by using a sequence of gross-to-finer Gaussian process priors on the objective function as we leverage two underlying facts - a) there exists a large enough length-scales for which the acquisition function can be made to have a significant gradient at any location in the parameter space, and b) the extrema of the consecutive acquisition functions are close although they are different only due to a small difference in the length-scales. Theoretical guarantees are provided and experiments clearly demonstrate the utility of the proposed method on both benchmark test functions and real-world case studies.</td>
+</tr>
+<tr id="bib_rana2017high" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{rana2017high,
+  author = {Rana, Santu and Li, Cheng and Gupta, Sunil and Nguyen, Vu and Venkatesh, Svetha},
+  title = {High dimensional bayesian optimization with elastic gaussian process},
+  booktitle = {International Conference on Machine Learning},
+  year = {2017},
+  pages = {2883--2891},
+  url = {http://proceedings.mlr.press/v70/rana17a/rana17a.pdf}
+}
+</pre></td>
+</tr>
+<tr id="shilton2017regret" class="entry">
+	<td>Shilton A, Gupta S, Rana S and Venkatesh S (2017), <i>"Regret Bounds for Transfer Learning in Bayesian Optimisation"</i>, In Artificial Intelligence and Statistics. , pp. 307-315.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('shilton2017regret','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_shilton2017regret" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{shilton2017regret,
+  author = {Shilton, Alistair and Gupta, Sunil and Rana, Santu and Venkatesh, Svetha},
+  title = {Regret Bounds for Transfer Learning in Bayesian Optimisation},
+  booktitle = {Artificial Intelligence and Statistics},
+  year = {2017},
+  pages = {307--315}
+}
+</pre></td>
+</tr>
+<tr id="tran2017hierarchical" class="entry">
+	<td>Tran T, Phung D, Bui H and Venkatesh S (2017), <i>"Hierarchical semi-Markov conditional random fields for deep recursive sequential data"</i>, Artificial Intelligence.  Vol. 246, pp. 53-85. Elsevier.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('tran2017hierarchical','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_tran2017hierarchical" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{tran2017hierarchical,
+  author = {Tran, Truyen and Phung, Dinh and Bui, Hung and Venkatesh, Svetha},
+  title = {Hierarchical semi-Markov conditional random fields for deep recursive sequential data},
+  journal = {Artificial Intelligence},
+  publisher = {Elsevier},
+  year = {2017},
+  volume = {246},
+  pages = {53--85}
+}
+</pre></td>
+</tr>
+<tr id="vellanki2017nonparametric" class="entry">
+	<td>Vellanki P, Duong T, Gupta S, Venkatesh S and Phung D (2017), <i>"Nonparametric discovery and analysis of learning patterns and autism subgroups from therapeutic data"</i>, Knowledge and information systems.  Vol. 51(1), pp. 127-157. Springer.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('vellanki2017nonparametric','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_vellanki2017nonparametric" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{vellanki2017nonparametric,
+  author = {Vellanki, Pratibha and Duong, Thi and Gupta, Sunil and Venkatesh, Svetha and Phung, Dinh},
+  title = {Nonparametric discovery and analysis of learning patterns and autism subgroups from therapeutic data},
+  journal = {Knowledge and information systems},
+  publisher = {Springer},
+  year = {2017},
+  volume = {51},
+  number = {1},
+  pages = {127--157}
+}
+</pre></td>
+</tr>
+<tr id="vu2017energy" class="entry">
+	<td>Vu H, Nguyen TD, Travers A, Venkatesh S and Phung D (2017), <i>"Energy-Based Localized Anomaly Detection in Video Surveillance"</i>, In Pacific-Asia Conference on Knowledge Discovery and Data Mining. , pp. 641-653.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('vu2017energy','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_vu2017energy" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{vu2017energy,
+  author = {Vu, Hung and Nguyen, Tu Dinh and Travers, Anthony and Venkatesh, Svetha and Phung, Dinh},
+  title = {Energy-Based Localized Anomaly Detection in Video Surveillance},
+  booktitle = {Pacific-Asia Conference on Knowledge Discovery and Data Mining},
+  year = {2017},
+  pages = {641--653}
+}
+</pre></td>
+</tr>
+</tbody>
+</table>
+<footer>
+ <small>Created by <a href="http://jabref.sourceforge.net">JabRef</a> on 04/12/2017.</small>
+</footer>
+<!-- file generated by JabRef -->
+</body>
+</html>

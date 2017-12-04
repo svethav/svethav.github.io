@@ -1,0 +1,998 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<title>JabRef references</title>
+<meta http-equiv="Content-Type" content="text/html; charset=windows-1252">
+<script type="text/javascript">
+<!--
+// QuickSearch script for JabRef HTML export 
+// Version: 3.0
+//
+// Copyright (c) 2006-2011, Mark Schenk
+//
+// This software is distributed under a Creative Commons Attribution 3.0 License
+// http://creativecommons.org/licenses/by/3.0/
+//
+// Features:
+// - intuitive find-as-you-type searching
+//    ~ case insensitive
+//    ~ ignore diacritics (optional)
+//
+// - search with/without Regular Expressions
+// - match BibTeX key
+//
+
+// Search settings
+var searchAbstract = true;	// search in abstract
+var searchReview = true;	// search in review
+
+var noSquiggles = true; 	// ignore diacritics when searching
+var searchRegExp = false; 	// enable RegExp searches
+
+
+if (window.addEventListener) {
+	window.addEventListener("load",initSearch,false); }
+else if (window.attachEvent) {
+	window.attachEvent("onload", initSearch); }
+
+function initSearch() {
+	// check for quick search table and searchfield
+	if (!document.getElementById('qs_table')||!document.getElementById('quicksearch')) { return; }
+
+	// load all the rows and sort into arrays
+	loadTableData();
+	
+	//find the query field
+	qsfield = document.getElementById('qs_field');
+
+	// previous search term; used for speed optimisation
+	prevSearch = '';
+
+	//find statistics location
+	stats = document.getElementById('stat');
+	setStatistics(-1);
+	
+	// set up preferences
+	initPreferences();
+
+	// shows the searchfield
+	document.getElementById('quicksearch').style.display = 'block';
+	document.getElementById('qs_field').onkeyup = quickSearch;
+}
+
+function loadTableData() {
+	// find table and appropriate rows
+	searchTable = document.getElementById('qs_table');
+	var allRows = searchTable.getElementsByTagName('tbody')[0].getElementsByTagName('tr');
+
+	// split all rows into entryRows and infoRows (e.g. abstract, review, bibtex)
+	entryRows = new Array(); infoRows = new Array(); absRows = new Array(); revRows = new Array();
+
+	// get data from each row
+	entryRowsData = new Array(); absRowsData = new Array(); revRowsData = new Array(); 
+	
+	BibTeXKeys = new Array();
+	
+	for (var i=0, k=0, j=0; i<allRows.length;i++) {
+		if (allRows[i].className.match(/entry/)) {
+			entryRows[j] = allRows[i];
+			entryRowsData[j] = stripDiacritics(getTextContent(allRows[i]));
+			allRows[i].id ? BibTeXKeys[j] = allRows[i].id : allRows[i].id = 'autokey_'+j;
+			j ++;
+		} else {
+			infoRows[k++] = allRows[i];
+			// check for abstract/review
+			if (allRows[i].className.match(/abstract/)) {
+				absRows.push(allRows[i]);
+				absRowsData[j-1] = stripDiacritics(getTextContent(allRows[i]));
+			} else if (allRows[i].className.match(/review/)) {
+				revRows.push(allRows[i]);
+				revRowsData[j-1] = stripDiacritics(getTextContent(allRows[i]));
+			}
+		}
+	}
+	//number of entries and rows
+	numEntries = entryRows.length;
+	numInfo = infoRows.length;
+	numAbs = absRows.length;
+	numRev = revRows.length;
+}
+
+function quickSearch(){
+	
+	tInput = qsfield;
+
+	if (tInput.value.length == 0) {
+		showAll();
+		setStatistics(-1);
+		qsfield.className = '';
+		return;
+	} else {
+		t = stripDiacritics(tInput.value);
+
+		if(!searchRegExp) { t = escapeRegExp(t); }
+			
+		// only search for valid RegExp
+		try {
+			textRegExp = new RegExp(t,"i");
+			closeAllInfo();
+			qsfield.className = '';
+		}
+			catch(err) {
+			prevSearch = tInput.value;
+			qsfield.className = 'invalidsearch';
+			return;
+		}
+	}
+	
+	// count number of hits
+	var hits = 0;
+
+	// start looping through all entry rows
+	for (var i = 0; cRow = entryRows[i]; i++){
+
+		// only show search the cells if it isn't already hidden OR if the search term is getting shorter, then search all
+		if(cRow.className.indexOf('noshow')==-1 || tInput.value.length <= prevSearch.length){
+			var found = false; 
+
+			if (entryRowsData[i].search(textRegExp) != -1 || BibTeXKeys[i].search(textRegExp) != -1){ 
+				found = true;
+			} else {
+				if(searchAbstract && absRowsData[i]!=undefined) {
+					if (absRowsData[i].search(textRegExp) != -1){ found=true; } 
+				}
+				if(searchReview && revRowsData[i]!=undefined) {
+					if (revRowsData[i].search(textRegExp) != -1){ found=true; } 
+				}
+			}
+			
+			if (found){
+				cRow.className = 'entry show';
+				hits++;
+			} else {
+				cRow.className = 'entry noshow';
+			}
+		}
+	}
+
+	// update statistics
+	setStatistics(hits)
+	
+	// set previous search value
+	prevSearch = tInput.value;
+}
+
+
+// Strip Diacritics from text
+// http://stackoverflow.com/questions/990904/javascript-remove-accents-in-strings
+
+// String containing replacement characters for stripping accents 
+var stripstring = 
+    'AAAAAAACEEEEIIII'+
+    'DNOOOOO.OUUUUY..'+
+    'aaaaaaaceeeeiiii'+
+    'dnooooo.ouuuuy.y'+
+    'AaAaAaCcCcCcCcDd'+
+    'DdEeEeEeEeEeGgGg'+
+    'GgGgHhHhIiIiIiIi'+
+    'IiIiJjKkkLlLlLlL'+
+    'lJlNnNnNnnNnOoOo'+
+    'OoOoRrRrRrSsSsSs'+
+    'SsTtTtTtUuUuUuUu'+
+    'UuUuWwYyYZzZzZz.';
+
+function stripDiacritics(str){
+
+    if(noSquiggles==false){
+        return str;
+    }
+
+    var answer='';
+    for(var i=0;i<str.length;i++){
+        var ch=str[i];
+        var chindex=ch.charCodeAt(0)-192;   // Index of character code in the strip string
+        if(chindex>=0 && chindex<stripstring.length){
+            // Character is within our table, so we can strip the accent...
+            var outch=stripstring.charAt(chindex);
+            // ...unless it was shown as a '.'
+            if(outch!='.')ch=outch;
+        }
+        answer+=ch;
+    }
+    return answer;
+}
+
+// http://stackoverflow.com/questions/3446170/escape-string-for-use-in-javascript-regex
+// NOTE: must escape every \ in the export code because of the JabRef Export...
+function escapeRegExp(str) {
+  return str.replace(/[-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, "\\$&");
+}
+
+function toggleInfo(articleid,info) {
+
+	var entry = document.getElementById(articleid);
+	var abs = document.getElementById('abs_'+articleid);
+	var rev = document.getElementById('rev_'+articleid);
+	var bib = document.getElementById('bib_'+articleid);
+	
+	if (abs && info == 'abstract') {
+		abs.className.indexOf('noshow') == -1?abs.className = 'abstract noshow':abs.className = 'abstract show';
+	} else if (rev && info == 'review') {
+		rev.className.indexOf('noshow') == -1?rev.className = 'review noshow':rev.className = 'review show';
+	} else if (bib && info == 'bibtex') {
+		bib.className.indexOf('noshow') == -1?bib.className = 'bibtex noshow':bib.className = 'bibtex show';
+	} else { 
+		return;
+	}
+
+	// check if one or the other is available
+	var revshow; var absshow; var bibshow;
+	(abs && abs.className.indexOf('noshow') == -1)? absshow = true: absshow = false;
+	(rev && rev.className.indexOf('noshow') == -1)? revshow = true: revshow = false;	
+	(bib && bib.className.indexOf('noshow') == -1)? bibshow = true: bibshow = false;
+	
+	// highlight original entry
+	if(entry) {
+		if (revshow || absshow || bibshow) {
+		entry.className = 'entry highlight show';
+		} else {
+		entry.className = 'entry show';
+		}
+	}
+	
+	// When there's a combination of abstract/review/bibtex showing, need to add class for correct styling
+	if(absshow) {
+		(revshow||bibshow)?abs.className = 'abstract nextshow':abs.className = 'abstract';
+	} 
+	if (revshow) {
+		bibshow?rev.className = 'review nextshow': rev.className = 'review';
+	}	
+	
+}
+
+function setStatistics (hits) {
+	if(hits < 0) { hits=numEntries; }
+	if(stats) { stats.firstChild.data = hits + '/' + numEntries}
+}
+
+function getTextContent(node) {
+	// Function written by Arve Bersvendsen
+	// http://www.virtuelvis.com
+	
+	if (node.nodeType == 3) {
+	return node.nodeValue;
+	} // text node
+	if (node.nodeType == 1 && node.className != "infolinks") { // element node
+	var text = [];
+	for (var chld = node.firstChild;chld;chld=chld.nextSibling) {
+		text.push(getTextContent(chld));
+	}
+	return text.join("");
+	} return ""; // some other node, won't contain text nodes.
+}
+
+function showAll(){
+	closeAllInfo();
+	for (var i = 0; i < numEntries; i++){ entryRows[i].className = 'entry show'; }
+}
+
+function closeAllInfo(){
+	for (var i=0; i < numInfo; i++){
+		if (infoRows[i].className.indexOf('noshow') ==-1) {
+			infoRows[i].className = infoRows[i].className + ' noshow';
+		}
+	}
+}
+
+function clearQS() {
+	qsfield.value = '';
+	showAll();
+}
+
+function redoQS(){
+	showAll();
+	quickSearch(qsfield);
+}
+
+function updateSetting(obj){
+	var option = obj.id;
+	var checked = obj.value;
+
+	switch(option)
+	 {
+	 case "opt_searchAbs":
+	   searchAbstract=!searchAbstract;
+	   redoQS();
+	   break;
+	 case "opt_searchRev":
+	   searchReview=!searchReview;
+	   redoQS();
+	   break;
+	 case "opt_useRegExp":
+	   searchRegExp=!searchRegExp;
+	   redoQS();
+	   break;
+	 case "opt_noAccents":
+	   noSquiggles=!noSquiggles;
+	   loadTableData();
+	   redoQS();
+	   break;
+	 }
+}
+
+function initPreferences(){
+	if(searchAbstract){document.getElementById("opt_searchAbs").checked = true;}
+	if(searchReview){document.getElementById("opt_searchRev").checked = true;}
+	if(noSquiggles){document.getElementById("opt_noAccents").checked = true;}
+	if(searchRegExp){document.getElementById("opt_useRegExp").checked = true;}
+	
+	if(numAbs==0) {document.getElementById("opt_searchAbs").parentNode.style.display = 'none';}
+	if(numRev==0) {document.getElementById("opt_searchRev").parentNode.style.display = 'none';}	
+}
+
+function toggleSettings(){
+	var togglebutton = document.getElementById('showsettings');
+	var settings = document.getElementById('settings');
+	
+	if(settings.className == "hidden"){
+		settings.className = "show";
+		togglebutton.innerText = "close settings";
+		togglebutton.textContent = "close settings";
+	}else{
+		settings.className = "hidden";
+		togglebutton.innerText = "settings...";		
+		togglebutton.textContent = "settings...";
+	}
+}
+
+-->
+</script>
+<style type="text/css">
+body { background-color: white; font-family: Arial, sans-serif; font-size: 13px; line-height: 1.2; padding: 1em; color: #2E2E2E; width: 50em; margin: auto auto; }
+
+form#quicksearch { width: auto; border-style: solid; border-color: gray; border-width: 1px 0px; padding: 0.7em 0.5em; display:none; position:relative; }
+span#searchstat {padding-left: 1em;}
+
+div#settings { margin-top:0.7em; /* border-bottom: 1px transparent solid; background-color: #efefef; border: 1px grey solid; */ }
+div#settings ul {margin: 0; padding: 0; }
+div#settings li {margin: 0; padding: 0 1em 0 0; display: inline; list-style: none; }
+div#settings li + li { border-left: 2px #efefef solid; padding-left: 0.5em;}
+div#settings input { margin-bottom: 0px;}
+
+div#settings.hidden {display:none;}
+
+#showsettings { border: 1px grey solid; padding: 0 0.5em; float:right; line-height: 1.6em; text-align: right; }
+#showsettings:hover { cursor: pointer; }
+
+.invalidsearch { background-color: red; }
+input[type="button"] { background-color: #efefef; border: 1px #2E2E2E solid;}
+
+table { border: 1px gray none; width: 100%; empty-cells: show; border-spacing: 0em 0.1em; margin: 1em 0em; }
+th, td { border: none; padding: 0.5em; vertical-align: top; text-align: justify; }
+
+td a { color: navy; text-decoration: none; }
+td a:hover  { text-decoration: underline; }
+
+tr.noshow { display: none;}
+tr.highlight td { background-color: #EFEFEF; border-top: 2px #2E2E2E solid; font-weight: bold; }
+tr.abstract td, tr.review td, tr.bibtex td { background-color: #EFEFEF; text-align: justify; border-bottom: 2px #2E2E2E solid; }
+tr.nextshow td { border-bottom-style: none; }
+
+tr.bibtex pre { width: 100%; overflow: auto; white-space: pre-wrap;}
+p.infolinks { margin: 0.3em 0em 0em 0em; padding: 0px; }
+
+@media print {
+	p.infolinks, #qs_settings, #quicksearch, t.bibtex { display: none !important; }
+	tr { page-break-inside: avoid; }
+}
+</style>
+</head>
+<body>
+
+<form action="" id="quicksearch">
+<input type="text" id="qs_field" autocomplete="off" placeholder="Type to search..." /> <input type="button" onclick="clearQS()" value="clear" />
+<span id="searchstat">Matching entries: <span id="stat">0</span></span>
+<div id="showsettings" onclick="toggleSettings()">settings...</div>
+<div id="settings" class="hidden">
+<ul>
+<li><input type="checkbox" class="search_setting" id="opt_searchAbs" onchange="updateSetting(this)"><label for="opt_searchAbs"> include abstract</label></li>
+<li><input type="checkbox" class="search_setting" id="opt_searchRev" onchange="updateSetting(this)"><label for="opt_searchRev"> include review</label></li>
+<li><input type="checkbox" class="search_setting" id="opt_useRegExp" onchange="updateSetting(this)"><label for="opt_useRegExp"> use RegExp</label></li>
+<li><input type="checkbox" class="search_setting" id="opt_noAccents" onchange="updateSetting(this)"><label for="opt_noAccents"> ignore accents</label></li>
+</ul>
+</div>
+</form>
+<table id="qs_table" border="1">
+<tbody>
+<tr id="gupta2013factorial" class="entry">
+	<td>Gupta S, Phung D and Venkatesh S (2013), <i>"Factorial Multi-Task Learning: A Bayesian Nonparametric Approach"</i>, In 30th International Conference on Machine Learning (ICML). , pp. 657-665.
+	<p class="infolinks">[<a href="javascript:toggleInfo('gupta2013factorial','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('gupta2013factorial','bibtex')">BibTeX</a>] [<a href="http://jmlr.org/proceedings/papers/v28/gupta13a.pdf" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_gupta2013factorial" class="abstract noshow">
+	<td><b>Abstract</b>: Multi-task learning is a paradigm shown to improve the performance of related tasks through their joint learning. However, for real-world data, it is usually difficult to assess the task relatedness and joint learning with unrelated tasks may lead to serious performance degradations. To this end, we propose a framework that groups the tasks based on their relatedness in a low dimensional subspace and allows a varying degree of relatedness among tasks by sharing the subspace bases across the groups. This provides the flexibility of no sharing when two sets of tasks are unrelated and partial/total sharing when the tasks are related. Importantly, the number of task-groups and the subspace dimensionality are automatically inferred from the data. This feature keeps the model beyond a specific set of parameters. To realize our framework, we present a novel Bayesian nonparametric prior that extends the traditional hierarchical beta process prior using a Dirichlet process to permit potentially infinite number of child beta processes. We apply our model for multi-task regression and classification applications. Experimental results using several synthetic and real-world datasets show the superiority of our model to other recent state-of-the-art multi-task learning methods.</td>
+</tr>
+<tr id="bib_gupta2013factorial" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{gupta2013factorial,
+  author = {Gupta, Sunil and Phung, Dinh and Venkatesh, Svetha},
+  title = {Factorial Multi-Task Learning: A Bayesian Nonparametric Approach},
+  booktitle = {30th International Conference on Machine Learning (ICML)},
+  year = {2013},
+  pages = {657--665},
+  url = {http://jmlr.org/proceedings/papers/v28/gupta13a.pdf}
+}
+</pre></td>
+</tr>
+<tr id="gupta2013regularized" class="entry">
+	<td>Gupta SK, Phung D, Adams B and Venkatesh S (2013), <i>"Regularized nonnegative shared subspace learning"</i>, Data mining and knowledge discovery.  Vol. 26(1), pp. 57-97. Springer.
+	<p class="infolinks">[<a href="javascript:toggleInfo('gupta2013regularized','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('gupta2013regularized','bibtex')">BibTeX</a>] [<a href="http://link.springer.com/article/10.1007%2Fs10618-011-0244-8" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_gupta2013regularized" class="abstract noshow">
+	<td><b>Abstract</b>: Joint modeling of related data sources has the potential to improve various data mining tasks such as transfer learning, multitask clustering, information retrieval etc. However, diversity among various data sources might outweigh the advantages of the joint modeling, and thus may result in performance degradations. To this end, we propose a regularized shared subspace learning framework, which can exploit the mutual strengths of related data sources while being immune to the effects of the variabilities of each source. This is achieved by further imposing a mutual orthogonality constraint on the constituent subspaces which segregates the common patterns from the source specific patterns, and thus, avoids performance degradations. Our approach is rooted in nonnegative matrix factorization and extends it further to enable joint analysis of related data sources. Experiments performed using three real world data sets for both retrieval and clustering applications demonstrate the benefits of regularization and validate the effectiveness of the model. Our proposed solution provides a formal framework appropriate for jointly analyzing related data sources and therefore, it is applicable to a wider context in data mining.</td>
+</tr>
+<tr id="bib_gupta2013regularized" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{gupta2013regularized,
+  author = {Gupta, Sunil Kumar and Phung, Dinh and Adams, Brett and Venkatesh, Svetha},
+  title = {Regularized nonnegative shared subspace learning},
+  journal = {Data mining and knowledge discovery},
+  publisher = {Springer},
+  year = {2013},
+  volume = {26},
+  number = {1},
+  pages = {57--97},
+  url = {http://link.springer.com/article/10.1007%2Fs10618-011-0244-8}
+}
+</pre></td>
+</tr>
+<tr id="li2013exploiting" class="entry">
+	<td>Li C, Phung D, Rana S and Venkatesh S (2013), <i>"Exploiting side information in distance dependent Chinese restaurant processes for data clustering"</i>, In IEEE International Conference on Multimedia and Expo (ICME). , pp. 1-6.
+	<p class="infolinks">[<a href="javascript:toggleInfo('li2013exploiting','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('li2013exploiting','bibtex')">BibTeX</a>] [<a href="http://ieeexplore.ieee.org/xpl/login.jsp?tp=&arnumber=6607475" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_li2013exploiting" class="abstract noshow">
+	<td><b>Abstract</b>: Multimedia contents often possess weakly annotated data such as tags, links and interactions. The weakly annotated data is called side information. It is the auxiliary information of data and provides hints for exploring the link structure of data. Most clustering algorithms utilize pure data for clustering. A model that combines pure data and side information, such as images and tags, documents and keywords, can perform better at understanding the underlying structure of data. We demonstrate how to incorporate different types of side information into a recently proposed Bayesian nonparametric model, the distance dependent Chinese restaurant process (DD-CRP). Our algorithm embeds the affinity of this information into the decay function of the DD-CRP when side information is in the form of subsets of discrete labels. It is flexible to measure distance based on arbitrary side information instead of only the spatial layout or time stamp of observations. At the same time, for noisy and incomplete side information, we set the decay function so that the DD-CRP reduces to the traditional Chinese restaurant process, thus not inducing side effects of noisy and incomplete side information. Experimental evaluations on two real-world datasets NUS WIDE and 20 Newsgroups show exploiting side information in DD-CRP significantly improves the clustering performance.</td>
+</tr>
+<tr id="bib_li2013exploiting" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{li2013exploiting,
+  author = {Li, Cheng and Phung, Dinh and Rana, Santu and Venkatesh, Svetha},
+  title = {Exploiting side information in distance dependent Chinese restaurant processes for data clustering},
+  booktitle = {IEEE International Conference on Multimedia and Expo (ICME)},
+  year = {2013},
+  pages = {1--6},
+  url = {http://ieeexplore.ieee.org/xpl/login.jsp?tp=&amp;arnumber=6607475}
+}
+</pre></td>
+</tr>
+<tr id="low2013compressive" class="entry">
+	<td>Low SY, Pham DS and Venkatesh S (2013), <i>"Compressive speech enhancement"</i>, Speech Communication.  Vol. 55(6), pp. 757-768. Elsevier.
+	<p class="infolinks">[<a href="javascript:toggleInfo('low2013compressive','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('low2013compressive','bibtex')">BibTeX</a>] [<a href="http://www.sciencedirect.com/science/article/pii/S0167639313000356" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_low2013compressive" class="abstract noshow">
+	<td><b>Abstract</b>: This paper presents an alternative approach to speech enhancement by using compressed sensing (CS). CS is a new sampling theory, which states that sparse signals can be reconstructed from far fewer measurements than the Nyquist sampling. As such, CS can be exploited to reconstruct only the sparse components (e.g., speech) from the mixture of sparse and non-sparse components (e.g., noise). This is possible because in a time-frequency representation, speech signal is sparse whilst most noise is non-sparse. Derivation shows that on average the signal to noise ratio (SNR) in the compressed domain is greater or equal than the uncompressed domain. Experimental results concur with the derivation and the proposed CS scheme achieves better or similar perceptual evaluation of speech quality (PESQ) scores and segmental SNR compared to other conventional methods in a wide range of input SNR.</td>
+</tr>
+<tr id="bib_low2013compressive" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{low2013compressive,
+  author = {Low, Siow Yong and Pham, Duc Son and Venkatesh, Svetha},
+  title = {Compressive speech enhancement},
+  journal = {Speech Communication},
+  publisher = {Elsevier},
+  year = {2013},
+  volume = {55},
+  number = {6},
+  pages = {757--768},
+  url = {http://www.sciencedirect.com/science/article/pii/S0167639313000356}
+}
+</pre></td>
+</tr>
+<tr id="moore2013toby" class="entry">
+	<td>Moore DW, Venkatesh S, Anderson A, Greenhill S, Phung D, Duong T, Cairns D, Marshall W and Whitehouse AJ (2013), <i>"TOBY play-pad application to teach children with ASD-A pilot trial"</i>, Developmental neurorehabilitation. (0), pp. 1-5. Informa UK Ltd. London.
+	<p class="infolinks">[<a href="javascript:toggleInfo('moore2013toby','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('moore2013toby','bibtex')">BibTeX</a>] [<a href="http://www.tandfonline.com/doi/abs/10.3109/17518423.2013.784817?journalCode=ipdr20" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_moore2013toby" class="abstract noshow">
+	<td><b>Abstract</b>: PURPOSE:<br>To investigate use patterns and learning outcomes associated with the use of Therapy Outcomes By You (TOBY. Playpad, an early intervention iPad application.<br>METHODS:<br>Participants were 33 families with a child with an autism spectrum disorder (ASD) aged 16 years or less, and with a diagnosis of autism or pervasive developmental disorder - not otherwise specified, and no secondary diagnoses. Families were provided with TOBY and asked to use it for 4-6 weeks, without further prompting or coaching. Dependent variables included participant use patterns and initial indicators of child progress.<br>RESULTS:<br>Twenty-three participants engaged extensively with TOBY, being exposed to at least 100 complete learn units and completing between 17% and 100% of the curriculum.<br>CONCLUSIONS:<br>TOBY may make a useful contribution to early intervention programming for children with ASD delivering high rates of appropriate learning opportunities. Further research evaluating the efficacy of TOBY in relation to independent indicators of functioning is warranted.</td>
+</tr>
+<tr id="bib_moore2013toby" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{moore2013toby,
+  author = {Moore, Dennis W and Venkatesh, Svetha and Anderson, Angelika and Greenhill, Stewart and Phung, Dinh and Duong, Thi and Cairns, Darin and Marshall, Wendy and Whitehouse, Andrew JO},
+  title = {TOBY play-pad application to teach children with ASD-A pilot trial},
+  journal = {Developmental neurorehabilitation},
+  publisher = {Informa UK Ltd. London},
+  year = {2013},
+  number = {0},
+  pages = {1--5},
+  url = {http://www.tandfonline.com/doi/abs/10.3109/17518423.2013.784817?journalCode=ipdr20}
+}
+</pre></td>
+</tr>
+<tr id="naseem2013novel" class="entry">
+	<td>Naseem I, Pham D-S and Venkatesh S (2013), <i>"A novel information theoretic approach to wavelet feature selection for texture classification"</i>, Computers &amp; Electrical Engineering.  Vol. 39(2), pp. 319-325. Elsevier.
+	<p class="infolinks">[<a href="javascript:toggleInfo('naseem2013novel','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('naseem2013novel','bibtex')">BibTeX</a>] [<a href="http://www.sciencedirect.com/science/article/pii/S0045790612002145" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_naseem2013novel" class="abstract noshow">
+	<td><b>Abstract</b>: In this research we address the problem of discriminant subband selection for texture classification. A novel Effective Information based Subband Selection (EISS) algorithm is proposed which utilizes the intra-class and inter-class distributions. Essentially these distributions are used to calculate the class-based entropy for a given subband. This class-based information is incorporated in the total information content of the training images to develop a robust Effective Information (EI) criterion. Only the subbands with the top EI criteria are allowed to participate in the classification process. The proposed EISS algorithm is evaluated on Brodatz texture database and has shown to outperform the most relevant method based on mutual information criterion.</td>
+</tr>
+<tr id="bib_naseem2013novel" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{naseem2013novel,
+  author = {Naseem, Imran and Pham, Duc-Son and Venkatesh, Svetha},
+  title = {A novel information theoretic approach to wavelet feature selection for texture classification},
+  journal = {Computers &amp; Electrical Engineering},
+  publisher = {Elsevier},
+  year = {2013},
+  volume = {39},
+  number = {2},
+  pages = {319--325},
+  url = {http://www.sciencedirect.com/science/article/pii/S0045790612002145}
+}
+</pre></td>
+</tr>
+<tr id="nguyen2013online" class="entry">
+	<td>Nguyen T, Dao B, Phung DQ, Venkatesh S, Berk M and others (2013), <i>"Online Social Capital: Mood, Topical and Psycholinguistic Analysis."</i>, In ICWSM: International Conference on Weblogs and Social Media. 
+	<p class="infolinks">[<a href="javascript:toggleInfo('nguyen2013online','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('nguyen2013online','bibtex')">BibTeX</a>] [<a href="http://prada-research.net/~dinh/uploads/Main/Publications/nguyen_dao_phung_venkatesh_berk_icwsm13.pdf" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_nguyen2013online" class="abstract noshow">
+	<td><b>Abstract</b>: Social media provides rich sources of personal information and community interaction which can be linked to aspect of mental health. In this paper we investigate manifest properties of textual messages, including latent topics, psycholinguistic features, and authors' mood, of a large corpus of blog posts, to analyze the aspect of social capital in social media communities. Using data collected from Live Journal, we find that bloggers with lower social capital have fewer positive moods and more negative moods than those with higher social capital. It is also found that people with low social capital have more random mood swings over time than the people with high social capital. Significant differences are found between low and high social capital groups when characterized by a set of latent topics and psycholinguistic features derived from blogposts, suggesting discriminative features, proved to be useful for classification tasks. Good prediction is achieved when classifying among social capital groups using topic and linguistic features, with linguistic features are found to have greater predictive power than latent topics. The significance of our work lies in the importance of online social capital to potential construction of automatic healthcare monitoring systems. We further establish the link between mood and social capital in online communities, suggesting the foundation of new systems to monitor online mental well-being.</td>
+</tr>
+<tr id="bib_nguyen2013online" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{nguyen2013online,
+  author = {Nguyen, Thin and Dao, Bo and Phung, Dinh Quoc and Venkatesh, Svetha and Berk, Michael and others},
+  title = {Online Social Capital: Mood, Topical and Psycholinguistic Analysis.},
+  booktitle = {ICWSM: International Conference on Weblogs and Social Media},
+  year = {2013},
+  url = {http://prada-research.net/~dinh/uploads/Main/Publications/nguyen_dao_phung_venkatesh_berk_icwsm13.pdf}
+}
+</pre></td>
+</tr>
+<tr id="nguyen2013event" class="entry">
+	<td>Nguyen T, Phung D, Adams B and Venkatesh S (2013), <i>"Event extraction using behaviors of sentiment signals and burst structure in social media"</i>, Knowledge and information systems.  Vol. 37(2), pp. 279-304. Springer.
+	<p class="infolinks">[<a href="javascript:toggleInfo('nguyen2013event','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('nguyen2013event','bibtex')">BibTeX</a>] [<a href="http://prada-research.net/~dinh/uploads/Main/Publications/Nguyen_etal_kais12.pdf" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_nguyen2013event" class="abstract noshow">
+	<td><b>Abstract</b>: Significant world events often cause the behavioral convergence of the expression of shared sentiment. This paper examines the use of the blogosphere as a framework to study user psychological behaviors, using their sentiment responses as a form of ‘sensor’ to infer real-world events of importance automatically. We formulate a novel temporal sentiment index function using quantitative measure of the valence value of bearing words in blog posts in which the set of affective bearing words is inspired from psychological research in emotion structure. The annual local minimum and maximum of the proposed sentiment signal function are utilized to extract significant events of the year and corresponding blog posts are further analyzed using topic modeling tools to understand their content. The paper then examines the correlation of topics discovered in relation to world news events reported by the mainstream news service provider, Cable News Network, and by using the Google search engine. Next, aiming at understanding sentiment at a finer granularity over time, we propose a stochastic burst detection model, extended from the work of Kleinberg, to work incrementally with stream data. The proposed model is then used to extract sentimental bursts occurring within a specific mood label (for example, a burst of observing ‘shocked’). The blog posts at those time indices are analyzed to extract topics, and these are compared to real-world news events. Our comprehensive set of experiments conducted on a large-scale set of 12 million posts from Livejournal shows that the proposed sentiment index function coincides well with significant world events while bursts in sentiment allow us to locate finer-grain external world events.</td>
+</tr>
+<tr id="bib_nguyen2013event" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{nguyen2013event,
+  author = {Nguyen, Thin and Phung, Dinh and Adams, Brett and Venkatesh, Svetha},
+  title = {Event extraction using behaviors of sentiment signals and burst structure in social media},
+  journal = {Knowledge and information systems},
+  publisher = {Springer},
+  year = {2013},
+  volume = {37},
+  number = {2},
+  pages = {279--304},
+  url = {http://prada-research.net/~dinh/uploads/Main/Publications/Nguyen_etal_kais12.pdf}
+}
+</pre></td>
+</tr>
+<tr id="nguyen2013extraction" class="entry">
+	<td>Nguyen T, Phung D, Gupta S and Venkatesh S (2013), <i>"Extraction of latent patterns and contexts from social honest signals using hierarchical Dirichlet processes"</i>, In IEEE International Conference on Pervasive Computing and Communications. , pp. 47-55.
+	<p class="infolinks">[<a href="javascript:toggleInfo('nguyen2013extraction','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('nguyen2013extraction','bibtex')">BibTeX</a>] [<a href="http://ieeexplore.ieee.org/xpl/login.jsp?tp=&arnumber=6526713" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_nguyen2013extraction" class="abstract noshow">
+	<td><b>Abstract</b>: A fundamental task in pervasive computing is reliable acquisition of contexts from sensor data. This is crucial to the operation of smart pervasive systems and services so that they might behave efficiently and appropriately upon a given context. Simple forms of context can often be extracted directly from raw data. Equally important, or more, is the hidden context and pattern buried inside the data, which is more challenging to discover. Most of existing approaches borrow methods and techniques from machine learning, dominantly employ parametric unsupervised learning and clustering techniques. Being parametric, a severe drawback of these methods is the requirement to specify the number of latent patterns in advance. In this paper, we explore the use of Bayesian nonparametric methods, a recent data modelling framework in machine learning, to infer latent patterns from sensor data acquired in a pervasive setting. Under this formalism, nonparametric prior distributions are used for data generative process, and thus, they allow the number of latent patterns to be learned automatically and grow with the data - as more data comes in, the model complexity can grow to explain new and unseen patterns. In particular, we make use of the hierarchical Dirichlet processes (HDP) to infer atomic activities and interaction patterns from honest signals collected from sociometric badges. We show how data from these sensors can be represented and learned with HDP. We illustrate insights into atomic patterns learned by the model and use them to achieve high-performance clustering. We also demonstrate the framework on the popular Reality Mining dataset, illustrating the ability of the model to automatically infer typical social groups in this dataset. Finally, our framework is generic and applicable to a much wider range of problems in pervasive computing where one needs to infer high-level, latent patterns and contexts from sensor data.</td>
+</tr>
+<tr id="bib_nguyen2013extraction" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{nguyen2013extraction,
+  author = {Nguyen, Thuong and Phung, Dinh and Gupta, Sunil and Venkatesh, Svetha},
+  title = {Extraction of latent patterns and contexts from social honest signals using hierarchical Dirichlet processes},
+  booktitle = {IEEE International Conference on Pervasive Computing and Communications},
+  year = {2013},
+  pages = {47--55},
+  url = {http://ieeexplore.ieee.org/xpl/login.jsp?tp=&amp;arnumber=6526713}
+}
+</pre></td>
+</tr>
+<tr id="Nguyen2013a" class="entry">
+	<td>Nguyen T, Phung D and Venkatesh S (2013), <i>"Analysis of psycholinguistic processes and topics in online autism communities"</i>, In IEEE International Conference on Multimedia and Expo. , pp. 1-6.
+	<p class="infolinks">[<a href="javascript:toggleInfo('Nguyen2013a','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('Nguyen2013a','bibtex')">BibTeX</a>] [<a href="http://ieeexplore.ieee.org/xpl/login.jsp?tp=&arnumber=6607615" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_Nguyen2013a" class="abstract noshow">
+	<td><b>Abstract</b>: Current growth of individuals on the autism spectrum disorder (ASD) requires continuous support and care. With the popularity of social media, online communities of people affected by ASD emerge. This paper presents an analysis of these online communities through understanding aspects that differentiate such communities. In this paper, the aspects given are not expressed in terms of friendship, exchange of information, social support or recreation, but rather with regard to the topics and linguistic styles that people express in their on-line writing. Using data collected unobtrusively from LiveJournal, we analyze posts made by ten autism communities in conjunction with those made by a control group of standard communities. Significant differences have been found between autism and control communities when characterized by latent topics of discussion and psycholinguistic features. Latent topics are found to have greater predictive power than linguistic features when classifying blog posts as either autism or control community. This study suggests that data mining of online blogs has the potential to detect clinically meaningful data. It opens the door to possibilities including sentinel risk surveillance and harnessing the power in diverse large datasets.</td>
+</tr>
+<tr id="bib_Nguyen2013a" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{Nguyen2013a,
+  author = {Nguyen, Thin and Phung, Dinh and Venkatesh, Svetha},
+  title = {Analysis of psycholinguistic processes and topics in online autism communities},
+  booktitle = {IEEE International Conference on Multimedia and Expo},
+  year = {2013},
+  pages = {1--6},
+  url = {http://ieeexplore.ieee.org/xpl/login.jsp?tp=&amp;arnumber=6607615}
+}
+</pre></td>
+</tr>
+<tr id="Nguyen2013b" class="entry">
+	<td>Nguyen TD, Tran T, Phung D and Venkatesh S (2013), <i>"Learning Parts-based Representations with Nonnegative Restricted Boltzmann Machine"</i>, In Asian Conference on Machine Learning. , pp. 133-148.
+	<p class="infolinks">[<a href="javascript:toggleInfo('Nguyen2013b','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('Nguyen2013b','bibtex')">BibTeX</a>] [<a href="http://jmlr.org/proceedings/papers/v29/Nguyen13.pdf" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_Nguyen2013b" class="abstract noshow">
+	<td><b>Abstract</b>: The success of any machine learning system depends critically on effective representations of data. In many cases, especially those in vision, it is desirable that a representation scheme uncovers the parts-based, additive nature of the data. Of current representation learning schemes, restricted Boltzmann machines (RBMs) have proved to be highly effective in unsupervised settings. However, when it comes to parts-based discovery, RBMs do not usually produce satisfactory results. We enhance such capacity of RBMs by introducing nonnegativity into the model weights, resulting in a variant called nonnegative restricted Boltzmann machine (NRBM). The NRBM produces not only controllable decomposition of data into interpretable parts but also offers a way to estimate the intrinsic nonlinear dimensionality of data. We demonstrate the capacity of our model on well-known datasets of handwritten digits, faces and documents. The decomposition quality on images is comparable with or better than what produced by the nonnegative matrix factorisation (NMF), and the thematic features uncovered from text are qualitatively interpretable in a similar manner to that of the latent Dirichlet allocation (LDA). However, the learnt features, when used for classification, are more discriminative than those discovered by both NMF and LDA and comparable with those by RBM.</td>
+</tr>
+<tr id="bib_Nguyen2013b" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{Nguyen2013b,
+  author = {Nguyen, Tu Dinh and Tran, Truyen and Phung, Dinh and Venkatesh, Svetha},
+  title = {Learning Parts-based Representations with Nonnegative Restricted Boltzmann Machine},
+  booktitle = {Asian Conference on Machine Learning},
+  year = {2013},
+  pages = {133--148},
+  url = {http://jmlr.org/proceedings/papers/v29/Nguyen13.pdf}
+}
+</pre></td>
+</tr>
+<tr id="nguyen2013latent" class="entry">
+	<td>Nguyen TD, Tran T, Phung D and Venkatesh S (2013), <i>"Latent Patient Profile Modelling and Applications with Mixed-Variate Restricted Boltzmann Machine"</i>, In Advances in Knowledge Discovery and Data Mining. , pp. 123-135. Springer.
+	<p class="infolinks">[<a href="javascript:toggleInfo('nguyen2013latent','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('nguyen2013latent','bibtex')">BibTeX</a>] [<a href="http://prada-research.net/~svetha/papers/2013/tu_truyen_phung_venkatesh_pakdd13.pdf" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_nguyen2013latent" class="abstract noshow">
+	<td><b>Abstract</b>: Efficient management of chronic diseases is critical in modern health care. We consider diabetes mellitus, and our ongoing goal is to examine how machine learning can deliver information for clinical efficiency. The challenge is to aggregate highly heterogeneous sources including demographics, diagnoses, pathologies and treatments, and extract similar groups so that care plans can be designed. To this end, we extend our recent model, the mixed-variate restricted Boltzmann machine (MV.RBM), as it seamlessly integrates multiple data types for each patient aggregated over time and outputs a homogeneous representation called “latent profile” that can be used for patient clustering, visualisation, disease correlation analysis and prediction. We demonstrate that the method outperforms all baselines on these tasks - the primary characteristics of patients in the same groups are able to be identified and the good result can be achieved for the diagnosis codes prediction.</td>
+</tr>
+<tr id="bib_nguyen2013latent" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@incollection{nguyen2013latent,
+  author = {Nguyen, Tu Dinh and Tran, Truyen and Phung, Dinh and Venkatesh, Svetha},
+  title = {Latent Patient Profile Modelling and Applications with Mixed-Variate Restricted Boltzmann Machine},
+  booktitle = {Advances in Knowledge Discovery and Data Mining},
+  publisher = {Springer},
+  year = {2013},
+  pages = {123--135},
+  url = {http://prada-research.net/~svetha/papers/2013/tu_truyen_phung_venkatesh_pakdd13.pdf}
+}
+</pre></td>
+</tr>
+<tr id="nguyen2013learning" class="entry">
+	<td>Nguyen TD, Tran T, Phung D and Venkatesh S (2013), <i>"Learning sparse latent representation and distance metric for image retrieval"</i>, In IEEE International Conference on Multimedia and Expo. , pp. 1-6.
+	<p class="infolinks">[<a href="javascript:toggleInfo('nguyen2013learning','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('nguyen2013learning','bibtex')">BibTeX</a>] [<a href="http://prada-research.net/~svetha/papers/2013/icme13_142.pdf" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_nguyen2013learning" class="abstract noshow">
+	<td><b>Abstract</b>: The performance of image retrieval depends critically on the semantic representation and the distance function used to estimate the similarity of two images. A good representation should integrate multiple visual and textual (e.g., tag) features and offer a step closer to the true semantics of interest (e.g., concepts). As the distance function operates on the representation, they are interdependent, and thus should be addressed at the same time. We propose a probabilistic solution to learn both the representation from multiple feature types and modalities and the distance metric from data. The learning is regularised so that the learned representation and information-theoretic metric will (i) preserve the regularities of the visual/textual spaces, (ii) enhance structured sparsity, (iii) encourage small intra-concept distances, and (iv) keep inter-concept images separated. We demonstrate the capacity of our method on the NUS-WIDE data. For the well-studied 13 animal subset, our method outperforms state-of-the-art rivals. On the subset of single-concept images, we gain 79:5% improvement over the standard nearest neighbours approach on the MAP score, and 45.7% on the NDCG.</td>
+</tr>
+<tr id="bib_nguyen2013learning" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{nguyen2013learning,
+  author = {Nguyen, Tu Dinh and Tran, Truyen and Phung, Dinh and Venkatesh, Svetha},
+  title = {Learning sparse latent representation and distance metric for image retrieval},
+  booktitle = {IEEE International Conference on Multimedia and Expo},
+  year = {2013},
+  pages = {1--6},
+  url = {http://prada-research.net/~svetha/papers/2013/icme13_142.pdf}
+}
+</pre></td>
+</tr>
+<tr id="nguyen2013interactive" class="entry">
+	<td>Nguyen T-V, Phung D, Gupta S and Venkatesh S (2013), <i>"Interactive browsing system for anomaly video surveillance"</i>, In IEEE Eighth International Conference on Intelligent Sensors, Sensor Networks and Information Processing. , pp. 384-389.
+	<p class="infolinks">[<a href="javascript:toggleInfo('nguyen2013interactive','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('nguyen2013interactive','bibtex')">BibTeX</a>] [<a href="http://ieeexplore.ieee.org/xpl/login.jsp?tp=&arnumber=6529821" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_nguyen2013interactive" class="abstract noshow">
+	<td><b>Abstract</b>: Existing anomaly detection methods in video surveillance exhibit lack of congruence between rare events detected by algorithms and what is considered anomalous by users. This paper introduces a novel browsing model to address this issue, allowing users to interactively examine rare events in an intuitive manner. Introducing a novel way to compute rare motion patterns, we estimate latent factors of foreground motion patterns through Bayesian Nonparametric Factor analysis. Each factor corresponds to a typical motion pattern. A rarity score for each factor is computed, and ordered in decreasing order of rarity, permitting users to browse events using any proportion of rare factors. Rare events correspond to frames that contain the rare factors chosen. We present the user with an interface to inspect events that incorporate these rarest factors in a spatial-temporal manner. We demonstrate the system on a public video data set, showing key aspects of the browsing paradigm.</td>
+</tr>
+<tr id="bib_nguyen2013interactive" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{nguyen2013interactive,
+  author = {Nguyen, Tien-Vu and Phung, Dinh and Gupta, Sunil and Venkatesh, Svetha},
+  title = {Interactive browsing system for anomaly video surveillance},
+  booktitle = {IEEE Eighth International Conference on Intelligent Sensors, Sensor Networks and Information Processing},
+  year = {2013},
+  pages = {384--389},
+  url = {http://ieeexplore.ieee.org/xpl/login.jsp?tp=&amp;arnumber=6529821}
+}
+</pre></td>
+</tr>
+<tr id="nguyen2013topic" class="entry">
+	<td>Nguyen T-V, Phung D and Venkatesh S (2013), <i>"Topic model kernel: An empirical study towards probabilistically reduced features for classification"</i>, In Neural Information Processing. , pp. 124-131.
+	<p class="infolinks">[<a href="javascript:toggleInfo('nguyen2013topic','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('nguyen2013topic','bibtex')">BibTeX</a>] [<a href="http://prada-research.net/~dinh/uploads/Main/Publications/nguyen_etal_tr13.pdf" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_nguyen2013topic" class="abstract noshow">
+	<td><b>Abstract</b>: Probabilistic topic models have become a standard in modern machine learning with wide applications in organizing and summarizing ‘documents’ in high-dimensional data such as images, videos, texts, gene expression data, and so on. Representing data by dimensional reduction of mixture proportion extracted from topic models is not only richer in semantics than bag-of-word interpretation, but also more informative for classification tasks. This paper describes the Topic Model Kernel (TMK), a high dimensional mapping for Support Vector Machine classification of data generated from probabilistic topic models. The applicability of our proposed kernel is demonstrated in several classification tasks from real world datasets. We outperform existing kernels on the distributional features and give the comparative results on non-probabilistic data types.</td>
+</tr>
+<tr id="bib_nguyen2013topic" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{nguyen2013topic,
+  author = {Nguyen, Tien-Vu and Phung, Dinh and Venkatesh, Svetha},
+  title = {Topic model kernel: An empirical study towards probabilistically reduced features for classification},
+  booktitle = {Neural Information Processing},
+  year = {2013},
+  pages = {124--131},
+  url = {http://prada-research.net/~dinh/uploads/Main/Publications/nguyen_etal_tr13.pdf}
+}
+</pre></td>
+</tr>
+<tr id="pham2013detection" class="entry">
+	<td>Pham D-S, Saha B, Phung DQ and Venkatesh S (2013), <i>"Detection of cross-channel anomalies"</i>, Knowledge and information systems.  Vol. 35(1), pp. 33-59. Springer.
+	<p class="infolinks">[<a href="javascript:toggleInfo('pham2013detection','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('pham2013detection','bibtex')">BibTeX</a>] [<a href="http://prada-research.net/~dinh/uploads/Main/Publications/Pham_etal_icdm11.pdf" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_pham2013detection" class="abstract noshow">
+	<td><b>Abstract</b>: The data deluge has created a great challenge for data mining applications wherein the rare topics of interest are often buried in the flood of major headlines. We identify and formulate a novel problem: cross-channel anomaly detection from multiple data channels. Cross-channel anomalies are common among the individual channel anomalies and are often portent of significant events. Central to this new problem is a development of theoretical foundation and methodology. Using the spectral approach, we propose a two-stage detection method: anomaly detection at a single-channel level, followed by the detection of cross-channel anomalies from the amalgamation of single-channel anomalies. We also derive the extension of the proposed detection method to an online settings, which automatically adapts to changes in the data over time at low computational complexity using incremental algorithms. Our mathematical analysis shows that our method is likely to reduce the false alarm rate by establishing theoretical results on the reduction of an impurity index. We demonstrate our method in two applications: document understanding with multiple text corpora and detection of repeated anomalies in large-scale video surveillance. The experimental results consistently demonstrate the superior performance of our method compared with related state-of-art methods, including the one-class SVM and principal component pursuit. In addition, our framework can be deployed in a decentralized manner, lending itself for large-scale data stream analysis.</td>
+</tr>
+<tr id="bib_pham2013detection" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{pham2013detection,
+  author = {Pham, Duc-Son and Saha, Budhaditya and Phung, Dinh Q and Venkatesh, Svetha},
+  title = {Detection of cross-channel anomalies},
+  journal = {Knowledge and information systems},
+  publisher = {Springer},
+  year = {2013},
+  volume = {35},
+  number = {1},
+  pages = {33--59},
+  url = {http://prada-research.net/~dinh/uploads/Main/Publications/Pham_etal_icdm11.pdf}
+}
+</pre></td>
+</tr>
+<tr id="pham2013efficient" class="entry">
+	<td>Pham D-S and Venkatesh S (2013), <i>"Efficient algorithms for robust recovery of images from compressed data"</i>, IEEE Transactions on Image Processing.  Vol. 22(12), pp. 4724-4737. IEEE.
+	<p class="infolinks">[<a href="javascript:toggleInfo('pham2013efficient','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('pham2013efficient','bibtex')">BibTeX</a>] [<a href="http://arxiv.org/pdf/1211.7276.pdf" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_pham2013efficient" class="abstract noshow">
+	<td><b>Abstract</b>: Compressed sensing (CS) is an important theory for sub-Nyquist sampling and recovery of compressible data. Recently, it has been extended to cope with the case where corruption to the CS data is modeled as impulsive noise. The new formulation, termed as robust CS, combines robust statistics and CS into a single framework to suppress outliers in the CS recovery. To solve the newly formulated robust CS problem, a scheme that iteratively solves a number of CS problems-the solutions from which provably converge to the true robust CS solution-is suggested. This scheme is, however, rather inefficient as it has to use existing CS solvers as a proxy. To overcome limitations with the original robust CS algorithm, we propose in this paper more computationally efficient algorithms by following latest advances in large-scale convex optimization for nonsmooth regularization. Furthermore, we also extend the robust CS formulation to various settings, including additional affine constraints, l1-norm loss function, mix-norm regularization, and multitasking, so as to further improve robust CS and derive simple but effective algorithms to solve these extensions. We demonstrate that the new algorithms provide much better computational advantage over the original robust CS method on the original robust CS formulation, and effectively solve more sophisticated extensions where the original methods simply cannot. We demonstrate the usefulness of the extensions on several imaging tasks.</td>
+</tr>
+<tr id="bib_pham2013efficient" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{pham2013efficient,
+  author = {Pham, Duc-Son and Venkatesh, Svetha},
+  title = {Efficient algorithms for robust recovery of images from compressed data},
+  journal = {IEEE Transactions on Image Processing},
+  publisher = {IEEE},
+  year = {2013},
+  volume = {22},
+  number = {12},
+  pages = {4724--4737},
+  url = {http://arxiv.org/pdf/1211.7276.pdf}
+}
+</pre></td>
+</tr>
+<tr id="phung2013connectivity" class="entry">
+	<td>Phung D, Gupta SK, Nguyen T and Venkatesh S (2013), <i>"Connectivity, online social capital, and mood: a Bayesian nonparametric analysis"</i>, IEEE Transactions on Multimedia.  Vol. 15(6), pp. 1316-1325. IEEE.
+	<p class="infolinks">[<a href="javascript:toggleInfo('phung2013connectivity','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('phung2013connectivity','bibtex')">BibTeX</a>] [<a href="http://ieeexplore.ieee.org/xpl/login.jsp?tp=&arnumber=6517534" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_phung2013connectivity" class="abstract noshow">
+	<td><b>Abstract</b>: Social capital indicative of community interaction and support is intrinsically linked to mental health. Increasing online presence is now the norm. Whilst social capital and its impact on social networks has been examined, its underlying connection to emotional response such as mood, has not been investigated. This paper studies this phenomena, revisiting the concept of â€œonline social capitalâ€ in social media communities using measurable aspects of social participation and social support. We establish the link between online capital derived from social media and mood, demonstrating results for different cohorts of social capital and social connectivity. We use novel Bayesian nonparametric factor analysis to extract the shared and individual factors in mood transition across groups of users of different levels of connectivity, quantifying patterns and degree of mood transitions. Using more than 1.6 million users from Live Journal, we show quantitatively that groups with lower social capital have fewer positive moods and more negative moods, than groups with higher social capital. We show similar effects in mood transitions. We establish a framework of how social media can be used as a barometer for mood. The significance lies in the importance of online social capital to mental well-being in overall. In establishing the link between mood and social capital in online communities, this work may suggest the foundation of new systems to monitor online mental well-being.</td>
+</tr>
+<tr id="bib_phung2013connectivity" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{phung2013connectivity,
+  author = {Phung, Dinh and Gupta, Sunil K and Nguyen, Thin and Venkatesh, Svetha},
+  title = {Connectivity, online social capital, and mood: a Bayesian nonparametric analysis},
+  journal = {IEEE Transactions on Multimedia},
+  publisher = {IEEE},
+  year = {2013},
+  volume = {15},
+  number = {6},
+  pages = {1316--1325},
+  url = {http://ieeexplore.ieee.org/xpl/login.jsp?tp=&amp;arnumber=6517534}
+}
+</pre></td>
+</tr>
+<tr id="rana2013split" class="entry">
+	<td>Rana S, Phung D and Venkatesh S (2013), <i>"Split-merge augmented Gibbs sampling for hierarchical dirichlet processes"</i>, In Advances in knowledge discovery and data mining: PAKDD 2013.  Vol. 7819, pp. 546-557. Springer, Berlin, Heidelberg.
+	<p class="infolinks">[<a href="javascript:toggleInfo('rana2013split','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('rana2013split','bibtex')">BibTeX</a>] [<a href="http://dx.doi.org/10.1007/978-3-642-37456-2_46" target="_blank">DOI</a>] [<a href="https://link.springer.com/chapter/10.1007/978-3-642-37456-2_46" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_rana2013split" class="abstract noshow">
+	<td><b>Abstract</b>: The Hierarchical Dirichlet Process (HDP) model is an important tool for topic analysis. Inference can be performed through a Gibbs sampler using the auxiliary variable method. We propose a split-merge procedure to augment this method of inference, facilitating faster convergence. Whilst the incremental Gibbs sampler changes topic assignments of each word conditioned on the previous observations and model hyper-parameters, the split-merge sampler changes the topic assignments over a group of words in a single move. This allows efficient exploration of state space. We evaluate the proposed sampler on a synthetic test set and two benchmark document corpus and show that the proposed sampler enables the MCMC chain to converge faster to the desired stationary distribution.</td>
+</tr>
+<tr id="bib_rana2013split" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@incollection{rana2013split,
+  author = {Rana, Santu and Phung, Dinh and Venkatesh, Svetha},
+  title = {Split-merge augmented Gibbs sampling for hierarchical dirichlet processes},
+  booktitle = {Advances in knowledge discovery and data mining: PAKDD 2013},
+  publisher = {Springer, Berlin, Heidelberg},
+  year = {2013},
+  volume = {7819},
+  pages = {546--557},
+  url = {https://link.springer.com/chapter/10.1007/978-3-642-37456-2_46},
+  doi = {10.1007/978-3-642-37456-2_46}
+}
+</pre></td>
+</tr>
+<tr id="budhaditya2013sparse" class="entry">
+	<td>Saha B, Pham DS, Phung D and Venkatesh S (2013), <i>"Sparse Subspace Clustering via Group Sparse Coding"</i>, In Thirteenth SIAM International Conference on Data Mining. , pp. 130-138.
+	<p class="infolinks">[<a href="javascript:toggleInfo('budhaditya2013sparse','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('budhaditya2013sparse','bibtex')">BibTeX</a>] [<a href="http://epubs.siam.org/doi/abs/10.1137/1.9781611972832.15" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_budhaditya2013sparse" class="abstract noshow">
+	<td><b>Abstract</b>: We propose in this paper a novel sparse subspace clustering method that regularizes sparse subspace representation by exploiting the structural sharing between tasks and data points via group sparse coding. We derive simple, provably convergent, and computationally efficient algorithms for solving the proposed group formulations. We demonstrate the advantage of the framework on three challenging benchmark datasets ranging from medical record data to image and text clustering and show that they consistently outperforms rival methods.</td>
+</tr>
+<tr id="bib_budhaditya2013sparse" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{budhaditya2013sparse,
+  author = {Saha, Budhaditya and Pham, Duc Son and Phung, Dinh and Venkatesh, Svetha},
+  title = {Sparse Subspace Clustering via Group Sparse Coding},
+  booktitle = {Thirteenth SIAM International Conference on Data Mining},
+  year = {2013},
+  pages = {130--138},
+  url = {http://epubs.siam.org/doi/abs/10.1137/1.9781611972832.15}
+}
+</pre></td>
+</tr>
+<tr id="budhaditya2013clustering" class="entry">
+	<td>Saha B, Pham D-S, Phung D and Venkatesh S (2013), <i>"Clustering patient medical records via sparse subspace representation"</i>, In Advances in Knowledge Discovery and Data Mining. , pp. 123-134. Springer.
+	<p class="infolinks">[<a href="javascript:toggleInfo('budhaditya2013clustering','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('budhaditya2013clustering','bibtex')">BibTeX</a>] [<a href="http://link.springer.com/chapter/10.1007/978-3-642-37456-2_11" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_budhaditya2013clustering" class="abstract noshow">
+	<td><b>Abstract</b>: The health industry is facing increasing challenge with “big data” as traditional methods fail to manage the scale and complexity. This paper examines clustering of patient records for chronic diseases to facilitate a better construction of care plans. We solve this problem under the framework of subspace clustering. Our novel contribution lies in the exploitation of sparse representation to discover subspaces automatically and a domain-specific construction of weighting matrices for patient records. We show the new formulation is readily solved by extending existing L1-regularized optimization algorithms. Using a cohort of both diabetes and stroke data we show that we outperform existing benchmark clustering techniques in the literature.</td>
+</tr>
+<tr id="bib_budhaditya2013clustering" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@incollection{budhaditya2013clustering,
+  author = {Saha, Budhaditya and Pham, Duc-Son and Phung, Dinh and Venkatesh, Svetha},
+  title = {Clustering patient medical records via sparse subspace representation},
+  booktitle = {Advances in Knowledge Discovery and Data Mining},
+  publisher = {Springer},
+  year = {2013},
+  pages = {123--134},
+  url = {http://link.springer.com/chapter/10.1007/978-3-642-37456-2_11}
+}
+</pre></td>
+</tr>
+<tr id="tran2013thurstonian" class="entry">
+	<td>Tran T, Phung D and Venkatesh S (2013), <i>"Thurstonian Boltzmann Machines: Learning from Multiple Inequalities"</i>, In 30th International Conference on Machine Learning. , pp. 46-54.
+	<p class="infolinks">[<a href="javascript:toggleInfo('tran2013thurstonian','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('tran2013thurstonian','bibtex')">BibTeX</a>] [<a href="http://jmlr.csail.mit.edu/proceedings/papers/v28/tran13.pdf" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_tran2013thurstonian" class="abstract noshow">
+	<td><b>Abstract</b>: We introduce Thurstonian Boltzmann Machines (TBM), a unified architecture that can naturally incorporate a wide range of data inputs at the same time. Our motivation rests in the Thurstonian view that many discrete data types can be considered as being generated from a subset of underlying latent continuous variables, and in the observation that each realisation of a discrete type imposes certain inequalities on those variables. Thus learning and inference in TBM reduce to making sense of a set of inequalities. Our proposed TBM naturally supports the following types: Gaussian, intervals, censored, binary, categorical, muticategorical, ordinal, (in)-complete rank with and without ties. We demonstrate the versatility and capacity of the proposed model on three applications of very different natures; namely handwritten digit recognition, collaborative filtering and complex social survey analysis.</td>
+</tr>
+<tr id="bib_tran2013thurstonian" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{tran2013thurstonian,
+  author = {Tran, Truyen and Phung, Dinh and Venkatesh, Svetha},
+  title = {Thurstonian Boltzmann Machines: Learning from Multiple Inequalities},
+  booktitle = {30th International Conference on Machine Learning},
+  year = {2013},
+  pages = {46--54},
+  url = {http://jmlr.csail.mit.edu/proceedings/papers/v28/tran13.pdf}
+}
+</pre></td>
+</tr>
+<tr id="TranPLHBV13" class="entry">
+	<td>Tran T, Phung DQ, Luo W, Harvey R, Berk M and Venkatesh S (2013), <i>"An integrated framework for suicide risk prediction"</i>, In The 19th ACM SIGKDD International Conference on Knowledge Discovery and Data Mining. , pp. 1410-1418.
+	<p class="infolinks">[<a href="javascript:toggleInfo('TranPLHBV13','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('TranPLHBV13','bibtex')">BibTeX</a>] [<a href="http://prada-research.net/~truyen/papers/KDD-published.pdf" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_TranPLHBV13" class="abstract noshow">
+	<td><b>Abstract</b>: Suicide is a major concern in society. Despite of great attention paid by the community with very substantive medico-legal implications, there has been no satisfying method that can reliably predict the future attempted or completed suicide. We present an integrated machine learning framework to tackle this challenge. Our proposed framework consists of a novel feature extraction scheme, an embedded feature selection process, a set of risk classifiers and finally, a risk calibration procedure. For temporal feature extraction, we cast the patient's clinical history into a temporal image to which a bank of one-side filters are applied. The responses are then partly transformed into mid-level features and then selected in l1-norm framework under the extreme value theory. A set of probabilistic ordinal risk classifiers are then applied to compute the risk probabilities and further re-rank the features. Finally, the predicted risks are calibrated. Together with our Australian partner, we perform comprehensive study on data collected for the mental health cohort, and the experiments validate that our proposed framework outperforms risk assessment instruments by medical practitioners.</td>
+</tr>
+<tr id="bib_TranPLHBV13" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{TranPLHBV13,
+  author = {Truyen Tran and Dinh Q. Phung and Wei Luo and Richard Harvey and Michael Berk and Svetha Venkatesh},
+  title = {An integrated framework for suicide risk prediction},
+  booktitle = {The 19th ACM SIGKDD International Conference on Knowledge Discovery and Data Mining},
+  year = {2013},
+  pages = {1410--1418},
+  url = {http://prada-research.net/~truyen/papers/KDD-published.pdf}
+}
+</pre></td>
+</tr>
+<tr id="Venkatesh_etal_ABAI13" class="entry">
+	<td>Venkatesh S, Greenhill S, Phung D, Duong T, Adams B, Marshall W and Cairns D (2013), <i>"TOBY: Therapy Outcomes By You"</i>, Association for Behavior Analysis International. Portland, Oregon, USA , pp. (poster).
+	<p class="infolinks">[<a href="javascript:toggleInfo('Venkatesh_etal_ABAI13','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('Venkatesh_etal_ABAI13','bibtex')">BibTeX</a>] [<a href="2013/conferences/Venkatesh_etal_ABAI13.pdf" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_Venkatesh_etal_ABAI13" class="abstract noshow">
+	<td><b>Abstract</b>: Early intervention is critical for children diagnosed with autism. Unfortunately, there is often a long gap of waiting, and wasting, time between a "formal" diagnosis and therapy. We describe TOBY Playpad (www.tobyplaypad.com) whose goal is to close this gap by empowering parents to help their children early. TOBY stands for Therapy Outcome by You and currently is an iPad application. It provides an adaptive syllabus of more than 320 activities developed by autism and machine learning experts to target key development areas which are known to be deficit for ASD children such as imitation, joint attention and language. TOBY delivers lessons, materials, instructions and interactions for both on-iPad and Natural Environment Tasks (NET) off-iPad activities. TOBY is highly adaptive and personalized, intelligently increasing its complexity, varying prompts and reinforcements as the child progresses over time. Prompting and reinforcing strategies are also recommended for parents to make the most of everyday opportunities to teach children. Essentially, TOBY removes the burden on parents from extensive preparation of materials and manual data recording. Three trials on 20, 50 and 36 children with AutismWest (www.autismwest.org.au) have been conducted since last year. The results are promising providing evidence of learning shown in skills that were not present previously in some children. NET activities are shown to be effective for children and popular with parents.</td>
+</tr>
+<tr id="bib_Venkatesh_etal_ABAI13" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{Venkatesh_etal_ABAI13,
+  author = {S. Venkatesh and S. Greenhill and D. Phung and T. Duong and B. Adams and W. Marshall and D. Cairns},
+  title = {TOBY: Therapy Outcomes By You},
+  year = {2013},
+  pages = {(poster)},
+  url = {2013/conferences/Venkatesh_etal_ABAI13.pdf}
+}
+</pre></td>
+</tr>
+<tr id="Venkatesh2013" class="entry">
+	<td>Venkatesh S, Phung D, Duong T, Greenhill S and Adams B (2013), <i>"TOBY: early intervention in autism through technology"</i>, In SIGCHI Conference on Human Factors in Computing Systems. , pp. 3187-3196.
+	<p class="infolinks">[<a href="javascript:toggleInfo('Venkatesh2013','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('Venkatesh2013','bibtex')">BibTeX</a>] [<a href="http://dl.acm.org/citation.cfm?id=2466437" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_Venkatesh2013" class="abstract noshow">
+	<td><b>Abstract</b>: We describe TOBY Playpad, an early intervention program for children with Autism Spectrum Disorder (ASD). TOBY teaches the teacher -- the parent -- during the crucial period following diagnosis, which often coincides with no access to formal therapy. We reflect on TOBY's evolution from table-top aid for flashcards to an iPad app covering a syllabus of 326 activities across 51 skills known to be deficient for ASD children, such imitation, joint attention and language. The design challenges unique to TOBY are the need to adapt to marked differences in each child's skills and rate of development (a trait of ASD) and teach parents unfamiliar concepts core to behavioural therapy, such as reinforcement, prompting, and fading. We report on three trials that successively decrease oversight and increase parental autonomy, and demonstrate clear evidence of learning. TOBY's uniquely intertwined Natural Environment Tasks are found to be effective for children and popular with parents.</td>
+</tr>
+<tr id="bib_Venkatesh2013" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{Venkatesh2013,
+  author = {Venkatesh, Svetha and Phung, Dinh and Duong, Thi and Greenhill, Stewart and Adams, Brett},
+  title = {TOBY: early intervention in autism through technology},
+  booktitle = {SIGCHI Conference on Human Factors in Computing Systems},
+  year = {2013},
+  pages = {3187--3196},
+  url = {http://dl.acm.org/citation.cfm?id=2466437}
+}
+</pre></td>
+</tr>
+<tr id="venkatesh_phung_greenhill_duong_adams_imfar13" class="entry">
+	<td>Venkatesh S, Phung D, Greenhill S, Duong T and Adams B (2013), <i>"Toby Playpad: Empowering Parents to Provide Early Therapy in the Home"</i>, In International Meeting for Autism Research (IMFAR). Donostia, Spain, May, 2013. 
+	<p class="infolinks"> [<a href="javascript:toggleInfo('venkatesh_phung_greenhill_duong_adams_imfar13','bibtex')">BibTeX</a>] [<a href="https://imfar.confex.com/imfar/2013/webprogram/Paper12416.html" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="bib_venkatesh_phung_greenhill_duong_adams_imfar13" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{venkatesh_phung_greenhill_duong_adams_imfar13,
+  author = {Venkatesh, S. and Phung, D. and Greenhill, S. and Duong, T. and Adams, B.},
+  title = {Toby Playpad: Empowering Parents to Provide Early Therapy in the Home},
+  booktitle = {International Meeting for Autism Research (IMFAR)},
+  year = {2013},
+  url = {https://imfar.confex.com/imfar/2013/webprogram/Paper12416.html}
+}
+</pre></td>
+</tr>
+<tr id="Venkatesh_etal_13capitalising" class="entry">
+	<td>Venkatesh S, Phung D, Tran T and Gupta SK (2013), <i>"Capitalising on the data deluge: Data analytics for healthcare"</i>, In Big Data. Health Informatics Society of Australia (HISA). 
+	<p class="infolinks"> [<a href="javascript:toggleInfo('Venkatesh_etal_13capitalising','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_Venkatesh_etal_13capitalising" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{Venkatesh_etal_13capitalising,
+  author = {S. Venkatesh and D. Phung and T. Tran and S. K. Gupta},
+  title = {Capitalising on the data deluge: Data analytics for healthcare},
+  booktitle = {Big Data. Health Informatics Society of Australia (HISA)},
+  year = {2013}
+}
+</pre></td>
+</tr>
+</tbody>
+</table>
+<footer>
+ <small>Created by <a href="http://jabref.sourceforge.net">JabRef</a> on 04/12/2017.</small>
+</footer>
+<!-- file generated by JabRef -->
+</body>
+</html>

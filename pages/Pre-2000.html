@@ -1,0 +1,2923 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<title>JabRef references</title>
+<meta http-equiv="Content-Type" content="text/html; charset=windows-1252">
+<script type="text/javascript">
+<!--
+// QuickSearch script for JabRef HTML export 
+// Version: 3.0
+//
+// Copyright (c) 2006-2011, Mark Schenk
+//
+// This software is distributed under a Creative Commons Attribution 3.0 License
+// http://creativecommons.org/licenses/by/3.0/
+//
+// Features:
+// - intuitive find-as-you-type searching
+//    ~ case insensitive
+//    ~ ignore diacritics (optional)
+//
+// - search with/without Regular Expressions
+// - match BibTeX key
+//
+
+// Search settings
+var searchAbstract = true;	// search in abstract
+var searchReview = true;	// search in review
+
+var noSquiggles = true; 	// ignore diacritics when searching
+var searchRegExp = false; 	// enable RegExp searches
+
+
+if (window.addEventListener) {
+	window.addEventListener("load",initSearch,false); }
+else if (window.attachEvent) {
+	window.attachEvent("onload", initSearch); }
+
+function initSearch() {
+	// check for quick search table and searchfield
+	if (!document.getElementById('qs_table')||!document.getElementById('quicksearch')) { return; }
+
+	// load all the rows and sort into arrays
+	loadTableData();
+	
+	//find the query field
+	qsfield = document.getElementById('qs_field');
+
+	// previous search term; used for speed optimisation
+	prevSearch = '';
+
+	//find statistics location
+	stats = document.getElementById('stat');
+	setStatistics(-1);
+	
+	// set up preferences
+	initPreferences();
+
+	// shows the searchfield
+	document.getElementById('quicksearch').style.display = 'block';
+	document.getElementById('qs_field').onkeyup = quickSearch;
+}
+
+function loadTableData() {
+	// find table and appropriate rows
+	searchTable = document.getElementById('qs_table');
+	var allRows = searchTable.getElementsByTagName('tbody')[0].getElementsByTagName('tr');
+
+	// split all rows into entryRows and infoRows (e.g. abstract, review, bibtex)
+	entryRows = new Array(); infoRows = new Array(); absRows = new Array(); revRows = new Array();
+
+	// get data from each row
+	entryRowsData = new Array(); absRowsData = new Array(); revRowsData = new Array(); 
+	
+	BibTeXKeys = new Array();
+	
+	for (var i=0, k=0, j=0; i<allRows.length;i++) {
+		if (allRows[i].className.match(/entry/)) {
+			entryRows[j] = allRows[i];
+			entryRowsData[j] = stripDiacritics(getTextContent(allRows[i]));
+			allRows[i].id ? BibTeXKeys[j] = allRows[i].id : allRows[i].id = 'autokey_'+j;
+			j ++;
+		} else {
+			infoRows[k++] = allRows[i];
+			// check for abstract/review
+			if (allRows[i].className.match(/abstract/)) {
+				absRows.push(allRows[i]);
+				absRowsData[j-1] = stripDiacritics(getTextContent(allRows[i]));
+			} else if (allRows[i].className.match(/review/)) {
+				revRows.push(allRows[i]);
+				revRowsData[j-1] = stripDiacritics(getTextContent(allRows[i]));
+			}
+		}
+	}
+	//number of entries and rows
+	numEntries = entryRows.length;
+	numInfo = infoRows.length;
+	numAbs = absRows.length;
+	numRev = revRows.length;
+}
+
+function quickSearch(){
+	
+	tInput = qsfield;
+
+	if (tInput.value.length == 0) {
+		showAll();
+		setStatistics(-1);
+		qsfield.className = '';
+		return;
+	} else {
+		t = stripDiacritics(tInput.value);
+
+		if(!searchRegExp) { t = escapeRegExp(t); }
+			
+		// only search for valid RegExp
+		try {
+			textRegExp = new RegExp(t,"i");
+			closeAllInfo();
+			qsfield.className = '';
+		}
+			catch(err) {
+			prevSearch = tInput.value;
+			qsfield.className = 'invalidsearch';
+			return;
+		}
+	}
+	
+	// count number of hits
+	var hits = 0;
+
+	// start looping through all entry rows
+	for (var i = 0; cRow = entryRows[i]; i++){
+
+		// only show search the cells if it isn't already hidden OR if the search term is getting shorter, then search all
+		if(cRow.className.indexOf('noshow')==-1 || tInput.value.length <= prevSearch.length){
+			var found = false; 
+
+			if (entryRowsData[i].search(textRegExp) != -1 || BibTeXKeys[i].search(textRegExp) != -1){ 
+				found = true;
+			} else {
+				if(searchAbstract && absRowsData[i]!=undefined) {
+					if (absRowsData[i].search(textRegExp) != -1){ found=true; } 
+				}
+				if(searchReview && revRowsData[i]!=undefined) {
+					if (revRowsData[i].search(textRegExp) != -1){ found=true; } 
+				}
+			}
+			
+			if (found){
+				cRow.className = 'entry show';
+				hits++;
+			} else {
+				cRow.className = 'entry noshow';
+			}
+		}
+	}
+
+	// update statistics
+	setStatistics(hits)
+	
+	// set previous search value
+	prevSearch = tInput.value;
+}
+
+
+// Strip Diacritics from text
+// http://stackoverflow.com/questions/990904/javascript-remove-accents-in-strings
+
+// String containing replacement characters for stripping accents 
+var stripstring = 
+    'AAAAAAACEEEEIIII'+
+    'DNOOOOO.OUUUUY..'+
+    'aaaaaaaceeeeiiii'+
+    'dnooooo.ouuuuy.y'+
+    'AaAaAaCcCcCcCcDd'+
+    'DdEeEeEeEeEeGgGg'+
+    'GgGgHhHhIiIiIiIi'+
+    'IiIiJjKkkLlLlLlL'+
+    'lJlNnNnNnnNnOoOo'+
+    'OoOoRrRrRrSsSsSs'+
+    'SsTtTtTtUuUuUuUu'+
+    'UuUuWwYyYZzZzZz.';
+
+function stripDiacritics(str){
+
+    if(noSquiggles==false){
+        return str;
+    }
+
+    var answer='';
+    for(var i=0;i<str.length;i++){
+        var ch=str[i];
+        var chindex=ch.charCodeAt(0)-192;   // Index of character code in the strip string
+        if(chindex>=0 && chindex<stripstring.length){
+            // Character is within our table, so we can strip the accent...
+            var outch=stripstring.charAt(chindex);
+            // ...unless it was shown as a '.'
+            if(outch!='.')ch=outch;
+        }
+        answer+=ch;
+    }
+    return answer;
+}
+
+// http://stackoverflow.com/questions/3446170/escape-string-for-use-in-javascript-regex
+// NOTE: must escape every \ in the export code because of the JabRef Export...
+function escapeRegExp(str) {
+  return str.replace(/[-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, "\\$&");
+}
+
+function toggleInfo(articleid,info) {
+
+	var entry = document.getElementById(articleid);
+	var abs = document.getElementById('abs_'+articleid);
+	var rev = document.getElementById('rev_'+articleid);
+	var bib = document.getElementById('bib_'+articleid);
+	
+	if (abs && info == 'abstract') {
+		abs.className.indexOf('noshow') == -1?abs.className = 'abstract noshow':abs.className = 'abstract show';
+	} else if (rev && info == 'review') {
+		rev.className.indexOf('noshow') == -1?rev.className = 'review noshow':rev.className = 'review show';
+	} else if (bib && info == 'bibtex') {
+		bib.className.indexOf('noshow') == -1?bib.className = 'bibtex noshow':bib.className = 'bibtex show';
+	} else { 
+		return;
+	}
+
+	// check if one or the other is available
+	var revshow; var absshow; var bibshow;
+	(abs && abs.className.indexOf('noshow') == -1)? absshow = true: absshow = false;
+	(rev && rev.className.indexOf('noshow') == -1)? revshow = true: revshow = false;	
+	(bib && bib.className.indexOf('noshow') == -1)? bibshow = true: bibshow = false;
+	
+	// highlight original entry
+	if(entry) {
+		if (revshow || absshow || bibshow) {
+		entry.className = 'entry highlight show';
+		} else {
+		entry.className = 'entry show';
+		}
+	}
+	
+	// When there's a combination of abstract/review/bibtex showing, need to add class for correct styling
+	if(absshow) {
+		(revshow||bibshow)?abs.className = 'abstract nextshow':abs.className = 'abstract';
+	} 
+	if (revshow) {
+		bibshow?rev.className = 'review nextshow': rev.className = 'review';
+	}	
+	
+}
+
+function setStatistics (hits) {
+	if(hits < 0) { hits=numEntries; }
+	if(stats) { stats.firstChild.data = hits + '/' + numEntries}
+}
+
+function getTextContent(node) {
+	// Function written by Arve Bersvendsen
+	// http://www.virtuelvis.com
+	
+	if (node.nodeType == 3) {
+	return node.nodeValue;
+	} // text node
+	if (node.nodeType == 1 && node.className != "infolinks") { // element node
+	var text = [];
+	for (var chld = node.firstChild;chld;chld=chld.nextSibling) {
+		text.push(getTextContent(chld));
+	}
+	return text.join("");
+	} return ""; // some other node, won't contain text nodes.
+}
+
+function showAll(){
+	closeAllInfo();
+	for (var i = 0; i < numEntries; i++){ entryRows[i].className = 'entry show'; }
+}
+
+function closeAllInfo(){
+	for (var i=0; i < numInfo; i++){
+		if (infoRows[i].className.indexOf('noshow') ==-1) {
+			infoRows[i].className = infoRows[i].className + ' noshow';
+		}
+	}
+}
+
+function clearQS() {
+	qsfield.value = '';
+	showAll();
+}
+
+function redoQS(){
+	showAll();
+	quickSearch(qsfield);
+}
+
+function updateSetting(obj){
+	var option = obj.id;
+	var checked = obj.value;
+
+	switch(option)
+	 {
+	 case "opt_searchAbs":
+	   searchAbstract=!searchAbstract;
+	   redoQS();
+	   break;
+	 case "opt_searchRev":
+	   searchReview=!searchReview;
+	   redoQS();
+	   break;
+	 case "opt_useRegExp":
+	   searchRegExp=!searchRegExp;
+	   redoQS();
+	   break;
+	 case "opt_noAccents":
+	   noSquiggles=!noSquiggles;
+	   loadTableData();
+	   redoQS();
+	   break;
+	 }
+}
+
+function initPreferences(){
+	if(searchAbstract){document.getElementById("opt_searchAbs").checked = true;}
+	if(searchReview){document.getElementById("opt_searchRev").checked = true;}
+	if(noSquiggles){document.getElementById("opt_noAccents").checked = true;}
+	if(searchRegExp){document.getElementById("opt_useRegExp").checked = true;}
+	
+	if(numAbs==0) {document.getElementById("opt_searchAbs").parentNode.style.display = 'none';}
+	if(numRev==0) {document.getElementById("opt_searchRev").parentNode.style.display = 'none';}	
+}
+
+function toggleSettings(){
+	var togglebutton = document.getElementById('showsettings');
+	var settings = document.getElementById('settings');
+	
+	if(settings.className == "hidden"){
+		settings.className = "show";
+		togglebutton.innerText = "close settings";
+		togglebutton.textContent = "close settings";
+	}else{
+		settings.className = "hidden";
+		togglebutton.innerText = "settings...";		
+		togglebutton.textContent = "settings...";
+	}
+}
+
+-->
+</script>
+<style type="text/css">
+body { background-color: white; font-family: Arial, sans-serif; font-size: 13px; line-height: 1.2; padding: 1em; color: #2E2E2E; width: 50em; margin: auto auto; }
+
+form#quicksearch { width: auto; border-style: solid; border-color: gray; border-width: 1px 0px; padding: 0.7em 0.5em; display:none; position:relative; }
+span#searchstat {padding-left: 1em;}
+
+div#settings { margin-top:0.7em; /* border-bottom: 1px transparent solid; background-color: #efefef; border: 1px grey solid; */ }
+div#settings ul {margin: 0; padding: 0; }
+div#settings li {margin: 0; padding: 0 1em 0 0; display: inline; list-style: none; }
+div#settings li + li { border-left: 2px #efefef solid; padding-left: 0.5em;}
+div#settings input { margin-bottom: 0px;}
+
+div#settings.hidden {display:none;}
+
+#showsettings { border: 1px grey solid; padding: 0 0.5em; float:right; line-height: 1.6em; text-align: right; }
+#showsettings:hover { cursor: pointer; }
+
+.invalidsearch { background-color: red; }
+input[type="button"] { background-color: #efefef; border: 1px #2E2E2E solid;}
+
+table { border: 1px gray none; width: 100%; empty-cells: show; border-spacing: 0em 0.1em; margin: 1em 0em; }
+th, td { border: none; padding: 0.5em; vertical-align: top; text-align: justify; }
+
+td a { color: navy; text-decoration: none; }
+td a:hover  { text-decoration: underline; }
+
+tr.noshow { display: none;}
+tr.highlight td { background-color: #EFEFEF; border-top: 2px #2E2E2E solid; font-weight: bold; }
+tr.abstract td, tr.review td, tr.bibtex td { background-color: #EFEFEF; text-align: justify; border-bottom: 2px #2E2E2E solid; }
+tr.nextshow td { border-bottom-style: none; }
+
+tr.bibtex pre { width: 100%; overflow: auto; white-space: pre-wrap;}
+p.infolinks { margin: 0.3em 0em 0em 0em; padding: 0px; }
+
+@media print {
+	p.infolinks, #qs_settings, #quicksearch, t.bibtex { display: none !important; }
+	tr { page-break-inside: avoid; }
+}
+</style>
+</head>
+<body>
+
+<form action="" id="quicksearch">
+<input type="text" id="qs_field" autocomplete="off" placeholder="Type to search..." /> <input type="button" onclick="clearQS()" value="clear" />
+<span id="searchstat">Matching entries: <span id="stat">0</span></span>
+<div id="showsettings" onclick="toggleSettings()">settings...</div>
+<div id="settings" class="hidden">
+<ul>
+<li><input type="checkbox" class="search_setting" id="opt_searchAbs" onchange="updateSetting(this)"><label for="opt_searchAbs"> include abstract</label></li>
+<li><input type="checkbox" class="search_setting" id="opt_searchRev" onchange="updateSetting(this)"><label for="opt_searchRev"> include review</label></li>
+<li><input type="checkbox" class="search_setting" id="opt_useRegExp" onchange="updateSetting(this)"><label for="opt_useRegExp"> use RegExp</label></li>
+<li><input type="checkbox" class="search_setting" id="opt_noAccents" onchange="updateSetting(this)"><label for="opt_noAccents"> ignore accents</label></li>
+</ul>
+</div>
+</form>
+<table id="qs_table" border="1">
+<tbody>
+<tr id="bui1997framework" class="entry">
+	<td>Bui H, Venkatesh S and Kieronska D (1997), <i>"A framework for coordination and learning among team members"</i>, In Third Australian Workshop on Distributed AI (DAI-97). , pp. 116-126.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('bui1997framework','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_bui1997framework" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{bui1997framework,
+  author = {Bui, HH and Venkatesh, Svetha and Kieronska, D},
+  title = {A framework for coordination and learning among team members},
+  booktitle = {Third Australian Workshop on Distributed AI (DAI-97)},
+  year = {1997},
+  pages = {116--126}
+}
+</pre></td>
+</tr>
+<tr id="bui1994formal" class="entry">
+	<td>Bui H, Venkatesh S and Kieronska D (1994), <i>"A formal representation for qualitative spatial knowledge"</i>, In 3rd International Conference on Automation, Robotics and Computer Vision. , pp. 846-851.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('bui1994formal','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_bui1994formal" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{bui1994formal,
+  author = {Bui, HH and Venkatesh, Svetha and Kieronska, D},
+  title = {A formal representation for qualitative spatial knowledge},
+  booktitle = {3rd International Conference on Automation, Robotics and Computer Vision},
+  year = {1994},
+  pages = {846--851}
+}
+</pre></td>
+</tr>
+<tr id="bui1999probabilistic" class="entry">
+	<td>Bui H, Venkatesh S and West G (1999), <i>"Probabilistic querying at multiple levels of abstraction in large spatial domains"</i>, In DICTA: Fifth International/National Biennial Conference on Digital Image Computing, Techniques and Applications. , pp. 285-290.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('bui1999probabilistic','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_bui1999probabilistic" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{bui1999probabilistic,
+  author = {Bui, HH and Venkatesh, Svetha and West, G},
+  title = {Probabilistic querying at multiple levels of abstraction in large spatial domains},
+  booktitle = {DICTA: Fifth International/National Biennial Conference on Digital Image Computing, Techniques and Applications},
+  year = {1999},
+  pages = {285--290}
+}
+</pre></td>
+</tr>
+<tr id="bui1996negotiating" class="entry">
+	<td>Bui HH, Kieronska D and Venkatesh S (1996), <i>"Negotiating agents that learn about others' preferences"</i>, In AAAI Spring Symposium on Adaptation, Co-evolution, and Learning in Multiagent Systems. , pp. 16-21.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('bui1996negotiating','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_bui1996negotiating" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{bui1996negotiating,
+  author = {Bui, Hung Hai and Kieronska, D and Venkatesh, Svetha},
+  title = {Negotiating agents that learn about others' preferences},
+  booktitle = {AAAI Spring Symposium on Adaptation, Co-evolution, and Learning in Multiagent Systems},
+  year = {1996},
+  pages = {16--21}
+}
+</pre></td>
+</tr>
+<tr id="bui1999learning" class="entry">
+	<td>Bui HH, Venkatesh S and Kieronska D (1999), <i>"Learning other agents preferences in multi-agent negotiation using bayesian classifiers"</i>, International Journal of Cooperative Information Systems.  Vol. 8(04), pp. 275-293. World Scientific.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('bui1999learning','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_bui1999learning" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{bui1999learning,
+  author = {Bui, Hung Hai and Venkatesh, Svetha and Kieronska, D},
+  title = {Learning other agents preferences in multi-agent negotiation using bayesian classifiers},
+  journal = {International Journal of Cooperative Information Systems},
+  publisher = {World Scientific},
+  year = {1999},
+  volume = {8},
+  number = {04},
+  pages = {275--293}
+}
+</pre></td>
+</tr>
+<tr id="bui1995constructing" class="entry">
+	<td>Bui HH, Venkatesh S and Kieronska D (1995), <i>"Constructing hierarchical abstraction for qualitative representations of space and time"</i>, Australian journal of intelligent information processing systems.  Vol. 2(3), pp. 36-46. Australian National University, Department of Computer Science, College of Engineering and Computer Science.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('bui1995constructing','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_bui1995constructing" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{bui1995constructing,
+  author = {Bui, Hung H and Venkatesh, Svetha and Kieronska, D},
+  title = {Constructing hierarchical abstraction for qualitative representations of space and time},
+  journal = {Australian journal of intelligent information processing systems},
+  publisher = {Australian National University, Department of Computer Science, College of Engineering and Computer Science},
+  year = {1995},
+  volume = {2},
+  number = {3},
+  pages = {36--46}
+}
+</pre></td>
+</tr>
+<tr id="bui1995multi" class="entry">
+	<td>Bui HH, Venkatesh S and Kieronska D (1995), <i>"A multi-agent incremental negotiation scheme for meetings scheduling"</i>, In Third Australian and New Zealand Conference on Intelligent Information Systems. , pp. 175-180.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('bui1995multi','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_bui1995multi" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{bui1995multi,
+  author = {Bui, Hung H and Venkatesh, Svetha and Kieronska, D},
+  title = {A multi-agent incremental negotiation scheme for meetings scheduling},
+  booktitle = {Third Australian and New Zealand Conference on Intelligent Information Systems},
+  year = {1995},
+  pages = {175--180}
+}
+</pre></td>
+</tr>
+<tr id="bui1999layered" class="entry">
+	<td>Bui HH, Venkatesh S and West G (1999), <i>"Layered dynamic probabilistic networks for spatio-temporal modelling"</i>, Intelligent Data Analysis.  Vol. 3(5), pp. 339-361. Elsevier.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('bui1999layered','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_bui1999layered" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{bui1999layered,
+  author = {Bui, Hung H and Venkatesh, Svetha and West, Geoff},
+  title = {Layered dynamic probabilistic networks for spatio-temporal modelling},
+  journal = {Intelligent Data Analysis},
+  publisher = {Elsevier},
+  year = {1999},
+  volume = {3},
+  number = {5},
+  pages = {339--361}
+}
+</pre></td>
+</tr>
+<tr id="campbell1999change" class="entry">
+	<td>Campbell S, Venkatesh S, Kumar M, Kraetzel M and Shoubridge P (1999), <i>"Change detection in dynamic communication networks"</i>, In DICTA: 5th International Biennial Conference on Digital Image Computing, Techniques and Applications. , pp. 94-98.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('campbell1999change','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_campbell1999change" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{campbell1999change,
+  author = {Campbell, S and Venkatesh, Svetha and Kumar, M and Kraetzel, M and Shoubridge, P},
+  title = {Change detection in dynamic communication networks},
+  booktitle = {DICTA: 5th International Biennial Conference on Digital Image Computing, Techniques and Applications},
+  year = {1999},
+  pages = {94--98}
+}
+</pre></td>
+</tr>
+<tr id="chahl1995centring" class="entry">
+	<td>Chahl J, Weber K, Srinivasan M and Venkatesh S (1995), <i>"Centring behaviour for mobile robots using insect based cues"</i>, In Asian Conference on Computer Vision. , pp. I224-I228.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('chahl1995centring','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_chahl1995centring" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{chahl1995centring,
+  author = {Chahl, J and Weber, K and Srinivasan, MV and Venkatesh, Svetha},
+  title = {Centring behaviour for mobile robots using insect based cues},
+  booktitle = {Asian Conference on Computer Vision},
+  year = {1995},
+  pages = {I224--I228}
+}
+</pre></td>
+</tr>
+<tr id="chisholm1997learning" class="entry">
+	<td>Chisholm C, West G and Venkatesh S (1997), <i>"Learning image attributes for tracking complex objects"</i>, In First Joint Australian and New Zealand biennial Conference on Digital Image and Vision Computing, Techniques and Applications: Theme, New Dimensions in Imaging. , pp. 385-390.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('chisholm1997learning','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_chisholm1997learning" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{chisholm1997learning,
+  author = {Chisholm, C and West, G and Venkatesh, Svetha},
+  title = {Learning image attributes for tracking complex objects},
+  booktitle = {First Joint Australian and New Zealand biennial Conference on Digital Image and Vision Computing, Techniques and Applications: Theme, New Dimensions in Imaging},
+  year = {1997},
+  pages = {385--390}
+}
+</pre></td>
+</tr>
+<tr id="cooper1993early" class="entry">
+	<td>Cooper J, Venkatesh S and Kitchen L (1993), <i>"Early jump-out corner detectors"</i>, IEEE transactions on pattern analysis and machine intelligence.  Vol. 15(8), pp. 823-828. IEEE Computer Society.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('cooper1993early','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_cooper1993early" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{cooper1993early,
+  author = {Cooper, James and Venkatesh, Svetha and Kitchen, Leslie},
+  title = {Early jump-out corner detectors},
+  journal = {IEEE transactions on pattern analysis and machine intelligence},
+  publisher = {IEEE Computer Society},
+  year = {1993},
+  volume = {15},
+  number = {8},
+  pages = {823--828}
+}
+</pre></td>
+</tr>
+<tr id="cooper1991dissimilarity" class="entry">
+	<td>Cooper J, Venkatesh S and Kitchen L (1991), <i>"The dissimilarity corner detector"</i>, In 5th International Conference on Advanced Robotics: Robots in Unstructured Environments. , pp. 1377-1382.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('cooper1991dissimilarity','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_cooper1991dissimilarity" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{cooper1991dissimilarity,
+  author = {Cooper, J and Venkatesh, Svetha and Kitchen, L},
+  title = {The dissimilarity corner detector},
+  booktitle = {5th International Conference on Advanced Robotics: Robots in Unstructured Environments},
+  year = {1991},
+  pages = {1377--1382}
+}
+</pre></td>
+</tr>
+<tr id="cooper1991early" class="entry">
+	<td>Cooper J, Venkatesh S and Kitchen L (1991), <i>"Early jump-out corner detectors"</i>, In IEEE Computer Society Conference on Computer Vision and Pattern Recognition. , pp. 688-689.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('cooper1991early','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_cooper1991early" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{cooper1991early,
+  author = {Cooper, James and Venkatesh, Svetha and Kitchen, Leslie},
+  title = {Early jump-out corner detectors},
+  booktitle = {IEEE Computer Society Conference on Computer Vision and Pattern Recognition},
+  year = {1991},
+  pages = {688--689}
+}
+</pre></td>
+</tr>
+<tr id="corbett1992occlusion" class="entry">
+	<td>Corbett M, Venkatesh S and Cooper J (1992), <i>"Occlusion based motion segmentation"</i>, In IEEE International Conference on Image Processing. , pp. 498-501.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('corbett1992occlusion','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_corbett1992occlusion" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{corbett1992occlusion,
+  author = {Corbett, M and Venkatesh, Svetha and Cooper, J},
+  title = {Occlusion based motion segmentation},
+  booktitle = {IEEE International Conference on Image Processing},
+  year = {1992},
+  pages = {498-501}
+}
+</pre></td>
+</tr>
+<tr id="corbett1991occlusion" class="entry">
+	<td>Corbett M, Venkatesh S and Cooper J (1991), <i>"An occultation based motion segmentation technique"</i>, In Dynamic Scene Understanding Workshop, International Joint Conference on Artificial Intelligence (IJCAI). 
+	<p class="infolinks"> [<a href="javascript:toggleInfo('corbett1991occlusion','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_corbett1991occlusion" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{corbett1991occlusion,
+  author = {Corbett, M and Venkatesh, Svetha and Cooper, J},
+  title = {An occultation based motion segmentation technique},
+  booktitle = {Dynamic Scene Understanding Workshop, International Joint Conference on Artificial Intelligence (IJCAI)},
+  year = {1991}
+}
+</pre></td>
+</tr>
+<tr id="drummond1996see++" class="entry">
+	<td>Drummond T, Caelli T and Venkatesh S (1996), <i>"SEE++: an object-oriented class library for task-specific vision"</i>, In Fourth International Conference on Control, Automation, Robotics and Vision (ICARCV ). , pp. 640-644.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('drummond1996see++','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_drummond1996see++" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{drummond1996see++,
+  author = {Drummond, T and Caelli, TMC and Venkatesh, Svetha},
+  title = {SEE++: an object-oriented class library for task-specific vision},
+  booktitle = {Fourth International Conference on Control, Automation, Robotics and Vision (ICARCV )},
+  year = {1996},
+  pages = {640--644}
+}
+</pre></td>
+</tr>
+<tr id="greenhill1999constructing" class="entry">
+	<td>Greenhill S and Venkatesh S (1999), <i>"Constructing and navigating personalised views of the Web"</i>, Information processing &amp; management.  Vol. 35(5), pp. 679-689. Elsevier.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('greenhill1999constructing','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_greenhill1999constructing" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{greenhill1999constructing,
+  author = {Greenhill, Stewart and Venkatesh, Svetha},
+  title = {Constructing and navigating personalised views of the Web},
+  journal = {Information processing &amp; management},
+  publisher = {Elsevier},
+  year = {1999},
+  volume = {35},
+  number = {5},
+  pages = {679--689}
+}
+</pre></td>
+</tr>
+<tr id="greenhill1998noetica" class="entry">
+	<td>Greenhill S and Venkatesh S (1998), <i>"Noetica: A tool for semantic data modelling"</i>, Information processing &amp; management.  Vol. 34(6), pp. 739-760. Elsevier.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('greenhill1998noetica','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_greenhill1998noetica" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{greenhill1998noetica,
+  author = {Greenhill, Stewart and Venkatesh, Svetha},
+  title = {Noetica: A tool for semantic data modelling},
+  journal = {Information processing &amp; management},
+  publisher = {Elsevier},
+  year = {1998},
+  volume = {34},
+  number = {6},
+  pages = {739--760}
+}
+</pre></td>
+</tr>
+<tr id="hosie1998classifying" class="entry">
+	<td>Hosie R, Venkatesh S and West G (1998), <i>"Classifying and detecting group behaviour from visual surveillance data"</i>, In Fourteenth International Conference on Pattern Recognition.  Vol. 1, pp. 602-604.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('hosie1998classifying','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_hosie1998classifying" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{hosie1998classifying,
+  author = {Hosie, Robin and Venkatesh, Svetha and West, Geoff},
+  title = {Classifying and detecting group behaviour from visual surveillance data},
+  booktitle = {Fourteenth International Conference on Pattern Recognition},
+  year = {1998},
+  volume = {1},
+  pages = {602--604}
+}
+</pre></td>
+</tr>
+<tr id="hosie1996detecting" class="entry">
+	<td>Hosie R, Venkatesh S and West G (1996), <i>"Detecting deviations from known paths and speeds in a surveillance situation"</i>, In Fourth International Conference on Control, Automation, Robotics and Vision. , pp. 3-6.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('hosie1996detecting','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_hosie1996detecting" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{hosie1996detecting,
+  author = {Hosie, Robin and Venkatesh, Svetha and West, Geoff},
+  title = {Detecting deviations from known paths and speeds in a surveillance situation},
+  booktitle = {Fourth International Conference on Control, Automation, Robotics and Vision},
+  year = {1996},
+  pages = {3--6}
+}
+</pre></td>
+</tr>
+<tr id="hosie1995towards" class="entry">
+	<td>Hosie R, Venkatesh S and West G (1995), <i>"Towards detecting patterns of human behaviour from image sequences"</i>, In Artificial Intelligence in Defence Workshop: 8th Australian Joint Conference on Artificial Intelligence. , pp. 109-121.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('hosie1995towards','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_hosie1995towards" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{hosie1995towards,
+  author = {Hosie, Robin and Venkatesh, Svetha and West, Geoff},
+  title = {Towards detecting patterns of human behaviour from image sequences},
+  booktitle = {Artificial Intelligence in Defence Workshop: 8th Australian Joint Conference on Artificial Intelligence},
+  year = {1995},
+  pages = {109--121}
+}
+</pre></td>
+</tr>
+<tr id="iang1995video" class="entry">
+	<td>Iang RO, Venkatesh S and Ieronska D (1995), <i>"Video indexing by spatial representation"</i>, In Third Australian and New Zealand Conference on Intelligent Information Systems. , pp. 99-104.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('iang1995video','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_iang1995video" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{iang1995video,
+  author = {Iang, Raymondzh Ongjunl and Venkatesh, Svetha and Ieronska, Dorotak},
+  title = {Video indexing by spatial representation},
+  booktitle = {Third Australian and New Zealand Conference on Intelligent Information Systems},
+  year = {1995},
+  pages = {99--104}
+}
+</pre></td>
+</tr>
+<tr id="keith1999beyond" class="entry">
+	<td>Keith Magee R, Venkatesh S and Takatsuka M (1999), <i>"Beyond the topological map: developing alternate mappings in self organisation"</i>, In Fifth International Biennial Conference on Digital Image Computing, Techniques, and Applications. , pp. 88-93.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('keith1999beyond','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_keith1999beyond" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{keith1999beyond,
+  author = {Keith Magee, Russell and Venkatesh, Svetha and Takatsuka, Masahiro},
+  title = {Beyond the topological map: developing alternate mappings in self organisation},
+  booktitle = {Fifth International Biennial Conference on Digital Image Computing, Techniques, and Applications},
+  year = {1999},
+  pages = {88--93}
+}
+</pre></td>
+</tr>
+<tr id="keith1999empirical" class="entry">
+	<td>Keith-Magee R, Venkatesh S and Takatsuka M (1999), <i>"An empirical study of neighbourhood decay in Kohonen's self organising map"</i>, In International Joint Conference on Neural Networks.  Vol. 3, pp. 1953-1958.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('keith1999empirical','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_keith1999empirical" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{keith1999empirical,
+  author = {Keith-Magee, Russell and Venkatesh, Svetha and Takatsuka, Masahiro},
+  title = {An empirical study of neighbourhood decay in Kohonen's self organising map},
+  booktitle = {International Joint Conference on Neural Networks},
+  year = {1999},
+  volume = {3},
+  pages = {1953--1958}
+}
+</pre></td>
+</tr>
+<tr id="keith1999importance" class="entry">
+	<td>Keith-Magee R, Venkatesh S and Takatsuka M (1999), <i>"The importance of neighbourhood size in self organising systems"</i>, In 6th International Conference on Neural Information Processing.  Vol. 1, pp. 267-272.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('keith1999importance','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_keith1999importance" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{keith1999importance,
+  author = {Keith-Magee, Russell and Venkatesh, Svetha and Takatsuka, Masahiro},
+  title = {The importance of neighbourhood size in self organising systems},
+  booktitle = {6th International Conference on Neural Information Processing},
+  year = {1999},
+  volume = {1},
+  pages = {267--272}
+}
+</pre></td>
+</tr>
+<tr id="kieronska1991event" class="entry">
+	<td>Kieronska D, Tsang C and Venkatesh S (1991), <i>"Event based planning"</i>, In AI Approaches to Production Planning: Master Scheduling for Sequencing Tools Workshop at International Joint Conference on Artificial Intelligence (IJCAI). 
+	<p class="infolinks"> [<a href="javascript:toggleInfo('kieronska1991event','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_kieronska1991event" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{kieronska1991event,
+  author = {Kieronska, D and Tsang, C.P. and Venkatesh, Svetha},
+  title = {Event based planning},
+  booktitle = {AI Approaches to Production Planning: Master Scheduling for Sequencing Tools Workshop at International Joint Conference on Artificial Intelligence (IJCAI)},
+  year = {1991}
+}
+</pre></td>
+</tr>
+<tr id="kieronska1996knowledge" class="entry">
+	<td>Kieronska D and Venkatesh S (1996), <i>"Knowledge representation with noetic maps"</i>, In SPIE Photonics-West. 
+	<p class="infolinks"> [<a href="javascript:toggleInfo('kieronska1996knowledge','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_kieronska1996knowledge" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{kieronska1996knowledge,
+  author = {Kieronska,D.H and Venkatesh,S},
+  title = {Knowledge representation with noetic maps},
+  booktitle = {SPIE Photonics-West},
+  year = {1996}
+}
+</pre></td>
+</tr>
+<tr id="kieronska1996media" class="entry">
+	<td>Kieronska D and Venkatesh S (1996), <i>"Media independent knowledge indexing and retrieval"</i>, In The learning superhighway, New World New worries: 3rd International Interactive Multimedia Symposium. , pp. 192-196.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('kieronska1996media','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_kieronska1996media" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{kieronska1996media,
+  author = {Kieronska, Dorota and Venkatesh, Svetha},
+  title = {Media independent knowledge indexing and retrieval},
+  booktitle = {The learning superhighway, New World New worries: 3rd International Interactive Multimedia Symposium},
+  year = {1996},
+  pages = {192--196}
+}
+</pre></td>
+</tr>
+<tr id="kieronska1994hierarchic" class="entry">
+	<td>Kieronska D and Venkatesh S (1994), <i>"Hierarchic representation for spatial knowledge"</i>, Lecture Notes in Computer Science 763, Computer Aided Systems Theory,EUROCAST. , pp. 314-329. Springer.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('kieronska1994hierarchic','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_kieronska1994hierarchic" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{kieronska1994hierarchic,
+  author = {Kieronska, Dorota and Venkatesh, Svetha},
+  title = {Hierarchic representation for spatial knowledge},
+  journal = {Lecture Notes in Computer Science 763, Computer Aided Systems Theory,EUROCAST},
+  publisher = {Springer},
+  year = {1994},
+  pages = {314--329}
+}
+</pre></td>
+</tr>
+<tr id="Kieronska1994indexing" class="entry">
+	<td>Kieronska D and Venkatesh S (1994), <i>"Indexing of video data"</i>, In In Workshop on Spatial and temporal Interaction: Representation and Reasoning. , pp. 230-239.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('Kieronska1994indexing','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_Kieronska1994indexing" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{Kieronska1994indexing,
+  author = {Kieronska, D and Venkatesh, Svetha},
+  title = {Indexing of video data},
+  booktitle = {In Workshop on Spatial and temporal Interaction: Representation and Reasoning},
+  year = {1994},
+  pages = {230-239}
+}
+</pre></td>
+</tr>
+<tr id="kieronska1994simd" class="entry">
+	<td>Kieronska D, Venkatesh S and Farrell C (1994), <i>"Simd implementation of region based quad trees"</i>, In Australasian Workshop on Parallel and Real-Time Systems. , pp. 205-211.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('kieronska1994simd','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_kieronska1994simd" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{kieronska1994simd,
+  author = {Kieronska, D and Venkatesh, Svetha and Farrell, C},
+  title = {Simd implementation of region based quad trees},
+  booktitle = {Australasian Workshop on Parallel and Real-Time Systems},
+  year = {1994},
+  pages = {205--211}
+}
+</pre></td>
+</tr>
+<tr id="kieronska1991planning" class="entry">
+	<td>Kieronska D, Venkatesh S and Tsang C (1991), <i>"Planning with events and states"</i>, In 2nd Conference in AI, Simulation and Planning in High Autonomy Systems. , pp. 181-187.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('kieronska1991planning','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_kieronska1991planning" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{kieronska1991planning,
+  author = {Kieronska, D and Venkatesh, Svetha and Tsang, C.P.},
+  title = {Planning with events and states},
+  booktitle = {2nd Conference in AI, Simulation and Planning in High Autonomy Systems},
+  year = {1991},
+  pages = {181-187}
+}
+</pre></td>
+</tr>
+<tr id="kieronska1992deduction" class="entry">
+	<td>Kieronska DH and Venkatesh S (1992), <i>"Deduction of high level spatial relations"</i>, In Technology for the Intelligent Factory, IEEE International Workshop on Emerging Technologies and Factory Automation. , pp. 684-687.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('kieronska1992deduction','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_kieronska1992deduction" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{kieronska1992deduction,
+  author = {Kieronska, Dorota H and Venkatesh, Svetha},
+  title = {Deduction of high level spatial relations},
+  booktitle = {Technology for the Intelligent Factory, IEEE International Workshop on Emerging Technologies and Factory Automation},
+  year = {1992},
+  pages = {684--687}
+}
+</pre></td>
+</tr>
+<tr id="kisworo1991automated" class="entry">
+	<td>Kisworo M, G W and Venkatesh S (1991), <i>"Automated visual inspection, a computer vision approach"</i>, In South East Asia Computer Conference. 
+	<p class="infolinks"> [<a href="javascript:toggleInfo('kisworo1991automated','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_kisworo1991automated" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{kisworo1991automated,
+  author = {Kisworo, M and West G and Venkatesh, Svetha},
+  title = {Automated visual inspection, a computer vision approach},
+  booktitle = {South East Asia Computer Conference},
+  year = {1991}
+}
+</pre></td>
+</tr>
+<tr id="kisworo1995detection" class="entry">
+	<td>Kisworo M, Venkatesh S and West G (1995), <i>"Detection of curved edges at subpixel accuracy using deformable models"</i>, IEE Proceedings-Vision, Image and Signal Processing.  Vol. 142(5), pp. 304-312. IET.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('kisworo1995detection','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_kisworo1995detection" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{kisworo1995detection,
+  author = {Kisworo, M and Venkatesh, Svetha and West, GAW},
+  title = {Detection of curved edges at subpixel accuracy using deformable models},
+  journal = {IEE Proceedings-Vision, Image and Signal Processing},
+  publisher = {IET},
+  year = {1995},
+  volume = {142},
+  number = {5},
+  pages = {304--312}
+}
+</pre></td>
+</tr>
+<tr id="kisworo1994subpixel" class="entry">
+	<td>Kisworo M, Venkatesh S and West G (1994), <i>"Sub-pixel edge extraction using the local energy model"</i>, IEEE Transactions on Pattern Analysis and Machine Intelligence.  Vol. 16(4), pp. 405-410.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('kisworo1994subpixel','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_kisworo1994subpixel" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{kisworo1994subpixel,
+  author = {Kisworo, M and Venkatesh, Svetha and West, Geoff},
+  title = {Sub-pixel edge extraction using the local energy model},
+  journal = {IEEE Transactions on Pattern Analysis and Machine Intelligence},
+  year = {1994},
+  volume = {16},
+  number = {4},
+  pages = {405--410}
+}
+</pre></td>
+</tr>
+<tr id="kisworo19912" class="entry">
+	<td>Kisworo M, Venkatesh S and West G (1991), <i>"2-D edge feature extraction to subpixel accuracy using the generalized energy approach"</i>, In 10 International Conference on EC3-Energy, Computer, Communication and Control Systems. , pp. 344-348.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('kisworo19912','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_kisworo19912" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{kisworo19912,
+  author = {Kisworo, Marsudi and Venkatesh, Svetha and West, Geoff},
+  title = {2-D edge feature extraction to subpixel accuracy using the generalized energy approach},
+  booktitle = {10 International Conference on EC3-Energy, Computer, Communication and Control Systems},
+  year = {1991},
+  pages = {344--348}
+}
+</pre></td>
+</tr>
+<tr id="kisworo1991subpixel" class="entry">
+	<td>Kisworo M, Venkatesh S and West G (1991), <i>"Subpixel precision edge modelling using the generalised energy approach"</i>, In 7th Scandinavian Conference on Image Analysis. , pp. 445-451.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('kisworo1991subpixel','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_kisworo1991subpixel" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{kisworo1991subpixel,
+  author = {Kisworo, M and Venkatesh, Svetha and West, G},
+  title = {Subpixel precision edge modelling using the generalised energy approach},
+  booktitle = {7th Scandinavian Conference on Image Analysis},
+  year = {1991},
+  pages = {445--451}
+}
+</pre></td>
+</tr>
+<tr id="kisworo1992curve" class="entry">
+	<td>Kisworo M, West G and Venkatesh S (1992), <i>"Curve reconstruction and segmentation using deformable models"</i>, In 2nd International Conference on Image Processing. , pp. 96-100.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('kisworo1992curve','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_kisworo1992curve" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{kisworo1992curve,
+  author = {Kisworo, M and West, G and Venkatesh, Svetha},
+  title = {Curve reconstruction and segmentation using deformable models},
+  booktitle = {2nd International Conference on Image Processing},
+  year = {1992},
+  pages = {96--100}
+}
+</pre></td>
+</tr>
+<tr id="kumar1997performance" class="entry">
+	<td>Kumar M and Venkatesh S (1997), <i>"Performance analysis of information access in mobile computing environments"</i>, In 11th International Parallel Processing Symposium. 
+	<p class="infolinks"> [<a href="javascript:toggleInfo('kumar1997performance','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_kumar1997performance" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{kumar1997performance,
+  author = {Kumar, M and Venkatesh, Svetha},
+  title = {Performance analysis of information access in mobile computing environments},
+  booktitle = {11th International Parallel Processing Symposium},
+  year = {1997}
+}
+</pre></td>
+</tr>
+<tr id="kumar1996power" class="entry">
+	<td>Kumar M and Venkatesh S (1996), <i>"Power saving schemes for mobile computing environments"</i>, In ADCOMP96: Fourth International Conference on Advanced Computing. , pp. 296-302.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('kumar1996power','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_kumar1996power" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{kumar1996power,
+  author = {Kumar, M and Venkatesh, Svetha},
+  title = {Power saving schemes for mobile computing environments},
+  booktitle = {ADCOMP96: Fourth International Conference on Advanced Computing},
+  year = {1996},
+  pages = {296--302}
+}
+</pre></td>
+</tr>
+<tr id="kumar1995hierarchical" class="entry">
+	<td>Kumar M, Venkatesh S, Kieronska D and Patnaik LM (1995), <i>"Hierarchical directory-based shared memory architecture"</i>, The Computer Journal.  Vol. 38(3), pp. 207-216. Br Computer Soc.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('kumar1995hierarchical','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_kumar1995hierarchical" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{kumar1995hierarchical,
+  author = {Kumar, MJ and Venkatesh, Svetha and Kieronska, D and Patnaik, Lalit M.},
+  title = {Hierarchical directory-based shared memory architecture},
+  journal = {The Computer Journal},
+  publisher = {Br Computer Soc},
+  year = {1995},
+  volume = {38},
+  number = {3},
+  pages = {207--216}
+}
+</pre></td>
+</tr>
+<tr id="kumar1999information" class="entry">
+	<td>Kumar M, Venkatesh S, Lim K-Y and Santoso H (1999), <i>"Information access and QoS issues in a mobile computing environment"</i>, Journal of network and computer applications.  Vol. 22(2), pp. 91-118. Elsevier.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('kumar1999information','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_kumar1999information" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{kumar1999information,
+  author = {Kumar, M and Venkatesh, Svetha and Lim, K-Y and Santoso, H},
+  title = {Information access and QoS issues in a mobile computing environment},
+  journal = {Journal of network and computer applications},
+  publisher = {Elsevier},
+  year = {1999},
+  volume = {22},
+  number = {2},
+  pages = {91--118}
+}
+</pre></td>
+</tr>
+<tr id="kumar1996distributed" class="entry">
+	<td>Kumar M, Venkatesh S and Panchanathan S (1996), <i>"A distributed directory scheme for information access in mobile computers"</i>, In 3rd International Conference on High Performance Computing. , pp. 138-143.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('kumar1996distributed','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_kumar1996distributed" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{kumar1996distributed,
+  author = {Kumar, MJ and Venkatesh, Svetha and Panchanathan, S},
+  title = {A distributed directory scheme for information access in mobile computers},
+  booktitle = {3rd International Conference on High Performance Computing},
+  year = {1996},
+  pages = {138--143}
+}
+</pre></td>
+</tr>
+<tr id="lam1995correcting" class="entry">
+	<td>Lam C, West G and Venkatesh S (1995), <i>"Correcting camera-to-foveation point distance using active vision strategies"</i>, In 2nd Asian Conference on Computer Vision 1995. , pp. 136-140.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('lam1995correcting','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_lam1995correcting" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{lam1995correcting,
+  author = {Lam, CP and West, GAW and Venkatesh, Svetha},
+  title = {Correcting camera-to-foveation point distance using active vision strategies},
+  booktitle = {2nd Asian Conference on Computer Vision 1995},
+  year = {1995},
+  pages = {136--140}
+}
+</pre></td>
+</tr>
+<tr id="lam1994emerging" class="entry">
+	<td>Lam C, West G and Venkatesh S (1994), <i>"Emerging hypothesis verification using function-based geometric models and active vision strategies"</i>, In CVPR'94: IEEE Computer Society Conference on Computer Vision and Pattern Recognition. , pp. 818-822.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('lam1994emerging','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_lam1994emerging" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{lam1994emerging,
+  author = {Lam, CP and West, GAW and Venkatesh, Svetha},
+  title = {Emerging hypothesis verification using function-based geometric models and active vision strategies},
+  booktitle = {CVPR'94: IEEE Computer Society Conference on Computer Vision and Pattern Recognition},
+  year = {1994},
+  pages = {818--822}
+}
+</pre></td>
+</tr>
+<tr id="lam1999obtaining" class="entry">
+	<td>Lam C, West G, Venkatesh S and Australia W (1999), <i>"Obtaining function models using active vision strategies"</i>, In 12th Conference on Vision Interface. , pp. 344-351.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('lam1999obtaining','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_lam1999obtaining" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{lam1999obtaining,
+  author = {Lam, CP and West, GAW and Venkatesh, Svetha and Australia, Western},
+  title = {Obtaining function models using active vision strategies},
+  booktitle = {12th Conference on Vision Interface},
+  year = {1999},
+  pages = {344--351}
+}
+</pre></td>
+</tr>
+<tr id="lam1996Learning" class="entry">
+	<td>Lam CP, Venkatesh S and Caelli TMC (1996), <i>"Learning motion from optic flow, international conference on automation"</i>, In Fourth International Conference on Automation, Robotics and Computer Vision. , pp. 655-659.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('lam1996Learning','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_lam1996Learning" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{lam1996Learning,
+  author = {Lam, C. P and Venkatesh, Svetha and Caelli, T. M. C},
+  title = {Learning motion from optic flow, international conference on automation},
+  booktitle = {Fourth International Conference on Automation, Robotics and Computer Vision},
+  year = {1996},
+  pages = {655-659}
+}
+</pre></td>
+</tr>
+<tr id="lam1997hypothesis" class="entry">
+	<td>Lam CP, Venkatesh S and West GA (1997), <i>"Hypothesis verification using parametric models and active vision strategies"</i>, Computer vision and image understanding.  Vol. 68(2), pp. 209-236. Elsevier.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('lam1997hypothesis','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_lam1997hypothesis" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{lam1997hypothesis,
+  author = {Lam, Chiou Peng and Venkatesh, Svetha and West, Geoff AW},
+  title = {Hypothesis verification using parametric models and active vision strategies},
+  journal = {Computer vision and image understanding},
+  publisher = {Elsevier},
+  year = {1997},
+  volume = {68},
+  number = {2},
+  pages = {209--236}
+}
+</pre></td>
+</tr>
+<tr id="lam1998Stabilising" class="entry">
+	<td>Lam P, G W and Venkatesh S (1998), <i>"Stabilising camera to foveation point distance in active vision"</i>, Pattern Recognition.  Vol. 31(10), pp. 1431-1441.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('lam1998Stabilising','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_lam1998Stabilising" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{lam1998Stabilising,
+  author = {Lam, P. and West G and Venkatesh, Svetha},
+  title = {Stabilising camera to foveation point distance in active vision},
+  journal = {Pattern Recognition},
+  year = {1998},
+  volume = {31},
+  number = {10},
+  pages = {1431--1441}
+}
+</pre></td>
+</tr>
+<tr id="lam1996analysing" class="entry">
+	<td>Lam P, Venkatesh S and West G (1996), <i>"Analysing the correction of the camera-to-fixation point distance in active vision"</i>, In ISSPA 96: Fourth International Symposium on Signal Processing and its Applications. 
+	<p class="infolinks"> [<a href="javascript:toggleInfo('lam1996analysing','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_lam1996analysing" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{lam1996analysing,
+  author = {Lam, P and Venkatesh, Svetha and West, G},
+  title = {Analysing the correction of the camera-to-fixation point distance in active vision},
+  booktitle = {ISSPA 96: Fourth International Symposium on Signal Processing and its Applications},
+  year = {1996}
+}
+</pre></td>
+</tr>
+<tr id="lam1993active" class="entry">
+	<td>Lam P, Venkatesh S and West G (1993), <i>"Active verification of emerging hypotheses using function based geometric models"</i>, In DICTA 1993: 2nd Conference on Digital Image Computing, Techniques and Applications. , pp. 47-54.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('lam1993active','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_lam1993active" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{lam1993active,
+  author = {Lam, P and Venkatesh, Svetha and West, G},
+  title = {Active verification of emerging hypotheses using function based geometric models},
+  booktitle = {DICTA 1993: 2nd Conference on Digital Image Computing, Techniques and Applications},
+  year = {1993},
+  pages = {47--54}
+}
+</pre></td>
+</tr>
+<tr id="lam1993function" class="entry">
+	<td>Lam P, Venkatesh S and West G (1993), <i>"Function directed geometric model-based active visual strategies"</i>, In ANZIIS 93: Australian and New Zealand Conference on Intelligent Information Systems. , pp. 732-736.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('lam1993function','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_lam1993function" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{lam1993function,
+  author = {Lam, P and Venkatesh, Svetha and West, GAW},
+  title = {Function directed geometric model-based active visual strategies},
+  booktitle = {ANZIIS 93: Australian and New Zealand Conference on Intelligent Information Systems},
+  year = {1993},
+  pages = {732--736}
+}
+</pre></td>
+</tr>
+<tr id="lau1996parallel" class="entry">
+	<td>Lau K, Kumar M and Venkatesh S (1996), <i>"Parallel matrix inversion techniques"</i>, In IEEE Second International Conference on Algorithms and Architectures for Parallel Processing,. , pp. 515-521.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('lau1996parallel','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_lau1996parallel" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{lau1996parallel,
+  author = {Lau, KK and Kumar, MJ and Venkatesh, Svetha},
+  title = {Parallel matrix inversion techniques},
+  booktitle = {IEEE Second International Conference on Algorithms and Architectures for Parallel Processing,},
+  year = {1996},
+  pages = {515--521}
+}
+</pre></td>
+</tr>
+<tr id="lazarescu1999incremental" class="entry">
+	<td>Lazarescu M, Venkatesh S and G W (1999), <i>"Incremental learning with forgetting"</i>, In Workshop on machine learning in computer vision, 16th International Conference on Machine Learning. 
+	<p class="infolinks"> [<a href="javascript:toggleInfo('lazarescu1999incremental','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_lazarescu1999incremental" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{lazarescu1999incremental,
+  author = {Lazarescu, M and Venkatesh, Svetha and West G},
+  title = {Incremental learning with forgetting},
+  booktitle = {Workshop on machine learning in computer vision, 16th International Conference on Machine Learning},
+  year = {1999}
+}
+</pre></td>
+</tr>
+<tr id="lazarescu1999classifying" class="entry">
+	<td>Lazarescu M, Venkatesh S and West G (1999), <i>"Classifying and learning cricket shots using camera motion"</i>, In Advanced topics in artificial intelligence: 12th Australian Joint Conference on Artificial Intelligence. , pp. 13-23.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('lazarescu1999classifying','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_lazarescu1999classifying" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{lazarescu1999classifying,
+  author = {Lazarescu, Mihai and Venkatesh, Svetha and West, Geoff},
+  title = {Classifying and learning cricket shots using camera motion},
+  booktitle = {Advanced topics in artificial intelligence: 12th Australian Joint Conference on Artificial Intelligence},
+  year = {1999},
+  pages = {13--23}
+}
+</pre></td>
+</tr>
+<tr id="lazarescu1998using" class="entry">
+	<td>Lazarescu M, Venkatesh S and West G (1998), <i>"Using natural language and video data to learn american football play"</i>, In International Conference on Advances in Pattern Recognition., September, 1998. , pp. 63-72.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('lazarescu1998using','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_lazarescu1998using" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{lazarescu1998using,
+  author = {Lazarescu,M and Venkatesh, Svetha and West,G},
+  title = {Using natural language and video data to learn american football play},
+  booktitle = {International Conference on Advances in Pattern Recognition},
+  year = {1998},
+  pages = {63-72}
+}
+</pre></td>
+</tr>
+<tr id="lazarescu1999applications" class="entry">
+	<td>Lazarescu M, Venkatesh S, West G and Caelli T (1999), <i>"Applications of machine learning to dynamic scene analysis"</i>, In DICTA'99: 5th International Biennial Conference on Digital Image Computing, Techniques and Applications. , pp. 57-62.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('lazarescu1999applications','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_lazarescu1999applications" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{lazarescu1999applications,
+  author = {Lazarescu, M and Venkatesh, Svetha and West, G and Caelli, T},
+  title = {Applications of machine learning to dynamic scene analysis},
+  booktitle = {DICTA'99: 5th International Biennial Conference on Digital Image Computing, Techniques and Applications},
+  year = {1999},
+  pages = {57--62}
+}
+</pre></td>
+</tr>
+<tr id="lazarescu1999automated" class="entry">
+	<td>Lazarescu M, Venkatesh S, West G and Caelli T (1999), <i>"On the automated interpretation and indexing of American football"</i>, In IEEE International Conference on Multimedia Computing and Systems.  Vol. 1, pp. 802-806.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('lazarescu1999automated','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_lazarescu1999automated" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{lazarescu1999automated,
+  author = {Lazarescu, Mihai and Venkatesh, Svetha and West, Geoff and Caelli, Terry},
+  title = {On the automated interpretation and indexing of American football},
+  booktitle = {IEEE International Conference on Multimedia Computing and Systems},
+  year = {1999},
+  volume = {1},
+  pages = {802--806}
+}
+</pre></td>
+</tr>
+<tr id="lazarescu1998combining" class="entry">
+	<td>Lazarescu M, Venkatesh S, West G and Caelli T (1998), <i>"Combining NL processing and video data to query American Football"</i>, In Fourteenth International Conference on Pattern Recognition.  Vol. 2, pp. 1238-1240.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('lazarescu1998combining','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_lazarescu1998combining" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{lazarescu1998combining,
+  author = {Lazarescu, Mihai and Venkatesh, Svetha and West, Geoff and Caelli, Terry},
+  title = {Combining NL processing and video data to query American Football},
+  booktitle = {Fourteenth International Conference on Pattern Recognition},
+  year = {1998},
+  volume = {2},
+  pages = {1238--1240}
+}
+</pre></td>
+</tr>
+<tr id="lazarescu1998extracting" class="entry">
+	<td>Lazarescu MM, Caelli T and Venkatesh S (1998), <i>"Extracting common subtrees from decision trees"</i>, International Journal of Pattern Recognition and Artificial Intelligence.  Vol. 12(06), pp. 867-879. World Scientific.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('lazarescu1998extracting','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_lazarescu1998extracting" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{lazarescu1998extracting,
+  author = {Lazarescu, Mihai Mugurel and Caelli, Terry and Venkatesh, Svetha},
+  title = {Extracting common subtrees from decision trees},
+  journal = {International Journal of Pattern Recognition and Artificial Intelligence},
+  publisher = {World Scientific},
+  year = {1998},
+  volume = {12},
+  number = {06},
+  pages = {867--879}
+}
+</pre></td>
+</tr>
+<tr id="leishman1995geometric" class="entry">
+	<td>Leishman M, Venkatesh S and West G (1995), <i>"Geometric hashing on SIMD architectures"</i>, In PART 95: Australasian Conference on Parallel and Real-Time Systems. , pp. 279-288.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('leishman1995geometric','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_leishman1995geometric" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{leishman1995geometric,
+  author = {Leishman, M and Venkatesh, Svetha and West, GAW},
+  title = {Geometric hashing on SIMD architectures},
+  booktitle = {PART 95: Australasian Conference on Parallel and Real-Time Systems},
+  year = {1995},
+  pages = {279--288}
+}
+</pre></td>
+</tr>
+<tr id="leishman1993implementing" class="entry">
+	<td>Leishman M, Venkatesh S and West G (1993), <i>"Implementing geometric hashing on the DEC Mpp 12000"</i>, In DICTA 93: digital image computing: techniques and applications. , pp. 260-265.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('leishman1993implementing','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_leishman1993implementing" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{leishman1993implementing,
+  author = {Leishman, M and Venkatesh, Svetha and West, GAW},
+  title = {Implementing geometric hashing on the DEC Mpp 12000},
+  booktitle = {DICTA 93: digital image computing: techniques and applications},
+  year = {1993},
+  pages = {260--265}
+}
+</pre></td>
+</tr>
+<tr id="lim1996resolution" class="entry">
+	<td>Lim E, Venkatesh S and West G (1996), <i>"Resolution consideration in spatially variant sensors"</i>, In 13th International Conference on Pattern Recognition., Aug, 1996.  Vol. 1, pp. 795-799.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('lim1996resolution','bibtex')">BibTeX</a>] [<a href="http://dx.doi.org/10.1109/ICPR.1996.546133" target="_blank">DOI</a>]</p>
+	</td>
+</tr>
+<tr id="bib_lim1996resolution" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{lim1996resolution,
+  author = {Lim, E.L. and Venkatesh, Svetha. and West, G.A.W.},
+  title = {Resolution consideration in spatially variant sensors},
+  booktitle = {13th International Conference on Pattern Recognition},
+  year = {1996},
+  volume = {1},
+  pages = {795-799},
+  doi = {10.1109/ICPR.1996.546133}
+}
+</pre></td>
+</tr>
+<tr id="lim1996tracking" class="entry">
+	<td>Lim E, West G and Venkatesh S (1996), <i>"Tracking in a space variant active vision system"</i>, In 13th International Conference on Pattern Recognition.  Vol. 1, pp. 745-749.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('lim1996tracking','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_lim1996tracking" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{lim1996tracking,
+  author = {Lim, EL and West, GAW and Venkatesh, Svetha},
+  title = {Tracking in a space variant active vision system},
+  booktitle = {13th International Conference on Pattern Recognition},
+  year = {1996},
+  volume = {1},
+  pages = {745--749}
+}
+</pre></td>
+</tr>
+<tr id="lim1999determining" class="entry">
+	<td>Lim F, Lam C and Venkatesh S (1999), <i>"Determining Ohject Fuuction Based on its Motion"</i>, In International conference on Computational Intelligence for Modelling, Control and Automation. , pp. 54-59.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('lim1999determining','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_lim1999determining" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{lim1999determining,
+  author = {Lim, FL and Lam, CP and Venkatesh, Svetha},
+  title = {Determining Ohject Fuuction Based on its Motion},
+  booktitle = {International conference on Computational Intelligence for Modelling, Control and Automation},
+  year = {1999},
+  pages = {54-59}
+}
+</pre></td>
+</tr>
+<tr id="lim1997resolution" class="entry">
+	<td>Lim F, Venkatesh S and West G (1997), <i>"Resolution consideration in spatially variant sensors"</i>, Image and Vision Computing.  Vol. 15(12), pp. 901-912. Elsevier.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('lim1997resolution','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_lim1997resolution" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{lim1997resolution,
+  author = {Lim, FL and Venkatesh, Svetha and West, GAW},
+  title = {Resolution consideration in spatially variant sensors},
+  journal = {Image and Vision Computing},
+  publisher = {Elsevier},
+  year = {1997},
+  volume = {15},
+  number = {12},
+  pages = {901--912}
+}
+</pre></td>
+</tr>
+<tr id="lim1998image" class="entry">
+	<td>Lim F, Venkatesh S, West G, Freii S, Rohl A, Rejhani M and Paterson G (1998), <i>"An image processing approach to monitor crystal growth"</i>, In International Conference on Robotics and Computer Vision. , pp. 1013-1017.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('lim1998image','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_lim1998image" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{lim1998image,
+  author = {Lim, FL and Venkatesh, Svetha and West, GAW and Freii, S and Rohl, AL and Rejhani, MM and Paterson, GM},
+  title = {An image processing approach to monitor crystal growth},
+  booktitle = {International Conference on Robotics and Computer Vision},
+  year = {1998},
+  pages = {1013--1017}
+}
+</pre></td>
+</tr>
+<tr id="lim1997use" class="entry">
+	<td>Lim F, West G and Venkatesh S (1997), <i>"Use of log polar space for foveation and feature recognition"</i>, In IEE Vision, Image and Signal Processing.  Vol. 144(6), pp. 323-331.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('lim1997use','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_lim1997use" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{lim1997use,
+  author = {Lim, FL and West, GAW and Venkatesh, Svetha},
+  title = {Use of log polar space for foveation and feature recognition},
+  booktitle = {IEE Vision, Image and Signal Processing},
+  year = {1997},
+  volume = {144},
+  number = {6},
+  pages = {323--331}
+}
+</pre></td>
+</tr>
+<tr id="lim1995feature" class="entry">
+	<td>Lim F, West G and Venkatesh S (1995), <i>"Feature detection and recognition in active vision utilizing foveation in log polar space"</i>, In ACCV'95: Second Asian Conference on Computer vision. , pp. 375-379.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('lim1995feature','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_lim1995feature" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{lim1995feature,
+  author = {Lim, FL and West, GAW and Venkatesh, Svetha},
+  title = {Feature detection and recognition in active vision utilizing foveation in log polar space},
+  booktitle = {ACCV'95: Second Asian Conference on Computer vision},
+  year = {1995},
+  pages = {375--379}
+}
+</pre></td>
+</tr>
+<tr id="lim1993shape" class="entry">
+	<td>Lim F, West G and Venkatesh S (1993), <i>"Shape recognition in active vision using log polar transformation"</i>, In DICTA 1993: 2nd Conference on Digital Image Computing, Techniques and Applications. , pp. 366-373.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('lim1993shape','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_lim1993shape" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{lim1993shape,
+  author = {Lim, FL and West, GAW and Venkatesh, Svetha},
+  title = {Shape recognition in active vision using log polar transformation},
+  booktitle = {DICTA 1993: 2nd Conference on Digital Image Computing, Techniques and Applications},
+  year = {1993},
+  pages = {366--373}
+}
+</pre></td>
+</tr>
+<tr id="ly1995evading" class="entry">
+	<td>Ly T, Venkatesh S and Kieronska D (1995), <i>"An evading and hiding agent"</i>, In IASTED International Conference, Modelling and Simulation. 
+	<p class="infolinks"> [<a href="javascript:toggleInfo('ly1995evading','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_ly1995evading" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{ly1995evading,
+  author = {Ly, T and Venkatesh, Svetha and Kieronska, D},
+  title = {An evading and hiding agent},
+  booktitle = {IASTED International Conference, Modelling and Simulation},
+  year = {1995}
+}
+</pre></td>
+</tr>
+<tr id="ly1993agents" class="entry">
+	<td>Ly T, Venkatesh S and Kieronska D (1993), <i>"Agents in adversarial domains-modelling environments in parallel"</i>, In AIS'93: 4th Annual conference on AI, Simulation and Planning in High Autonomy Systems: Integrating Virtual Reality and Model-Based Environments. , pp. 81-89.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('ly1993agents','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_ly1993agents" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{ly1993agents,
+  author = {Ly, TC and Venkatesh, Svetha and Kieronska, D},
+  title = {Agents in adversarial domains-modelling environments in parallel},
+  booktitle = {AIS'93: 4th Annual conference on AI, Simulation and Planning in High Autonomy Systems: Integrating Virtual Reality and Model-Based Environments},
+  year = {1993},
+  pages = {81--89}
+}
+</pre></td>
+</tr>
+<tr id="mills1998information" class="entry">
+	<td>Mills B, Venkatesh S, Kumar M and Narasimhan L (1998), <i>"Information retrieval in documents using semantic criteria"</i>, In ADCS'98: Third Australian Document Computing Symposium. , pp. 47-53.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('mills1998information','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_mills1998information" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{mills1998information,
+  author = {Mills, B and Venkatesh, Svetha and Kumar, M and Narasimhan, L},
+  title = {Information retrieval in documents using semantic criteria},
+  booktitle = {ADCS'98: Third Australian Document Computing Symposium},
+  year = {1998},
+  pages = {47--53}
+}
+</pre></td>
+</tr>
+<tr id="owens1989robust" class="entry">
+	<td>Owens R and Venkatesh S (1989), <i>"A robust scheme for isolating and classifying visual features"</i>, In International Conference on ArtificiaI Intelligence in Industry and Government. , pp. 664-679.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('owens1989robust','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_owens1989robust" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{owens1989robust,
+  author = {Owens, R and Venkatesh, Svetha},
+  title = {A robust scheme for isolating and classifying visual features},
+  booktitle = {International Conference on ArtificiaI Intelligence in Industry and Government},
+  year = {1989},
+  pages = {664--679}
+}
+</pre></td>
+</tr>
+<tr id="owens1989edge" class="entry">
+	<td>Owens R, Venkatesh S and Ross J (1989), <i>"Edge detection is a projection"</i>, Pattern Recognition Letters.  Vol. 9(4), pp. 233-244. Elsevier.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('owens1989edge','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_owens1989edge" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{owens1989edge,
+  author = {Owens, Robyn and Venkatesh, Svetha and Ross, John},
+  title = {Edge detection is a projection},
+  journal = {Pattern Recognition Letters},
+  publisher = {Elsevier},
+  year = {1989},
+  volume = {9},
+  number = {4},
+  pages = {233--244}
+}
+</pre></td>
+</tr>
+<tr id="raman1998retrieval" class="entry">
+	<td>Raman H, Venkatesh S and Lam C (1998), <i>"Retrieval of Images using similarity based Queries"</i>, In ICVGIP: Computer vision, graphics and image processing: recent advances: Indian Conference on Computer Vision, Graphics and Image Processing. , pp. 351-357.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('raman1998retrieval','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_raman1998retrieval" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{raman1998retrieval,
+  author = {Raman, H and Venkatesh, Svetha and Lam, CP},
+  title = {Retrieval of Images using similarity based Queries},
+  booktitle = {ICVGIP: Computer vision, graphics and image processing: recent advances: Indian Conference on Computer Vision, Graphics and Image Processing},
+  year = {1998},
+  pages = {351--357}
+}
+</pre></td>
+</tr>
+<tr id="robey1993predicting" class="entry">
+	<td>Robey M, Venkatesh S and West G (1993), <i>"Predicting object features due to specularity for a general purpose model based 3D object recognition system"</i>, In DICTA 93: digital image computing: techniques and applications. , pp. 517-524.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('robey1993predicting','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_robey1993predicting" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{robey1993predicting,
+  author = {Robey, M and Venkatesh, Svetha and West, GAW},
+  title = {Predicting object features due to specularity for a general purpose model based 3D object recognition system},
+  booktitle = {DICTA 93: digital image computing: techniques and applications},
+  year = {1993},
+  pages = {517--524}
+}
+</pre></td>
+</tr>
+<tr id="robey1992satisfying" class="entry">
+	<td>Robey M, Venkatesh S and West G (1992), <i>"Satisfying viewsphere requirements using raytracing and physical modelling techniques"</i>, In 2nd International Conference on Image Processing. , pp. 452-456.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('robey1992satisfying','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_robey1992satisfying" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{robey1992satisfying,
+  author = {Robey, M and Venkatesh, Svetha and West, GAW},
+  title = {Satisfying viewsphere requirements using raytracing and physical modelling techniques},
+  booktitle = {2nd International Conference on Image Processing},
+  year = {1992},
+  pages = {452--456}
+}
+</pre></td>
+</tr>
+<tr id="robey1995investigation" class="entry">
+	<td>Robey M, West G and Venkatesh S (1995), <i>"An investigation into the use of physical modeling for the prediction of various feature types visible from different viewpoints"</i>, Computer vision and image understanding.  Vol. 61(3), pp. 417-429. Elsevier.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('robey1995investigation','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_robey1995investigation" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{robey1995investigation,
+  author = {Robey, M and West, G and Venkatesh, Svetha},
+  title = {An investigation into the use of physical modeling for the prediction of various feature types visible from different viewpoints},
+  journal = {Computer vision and image understanding},
+  publisher = {Elsevier},
+  year = {1995},
+  volume = {61},
+  number = {3},
+  pages = {417--429}
+}
+</pre></td>
+</tr>
+<tr id="robey1994investigation" class="entry">
+	<td>Robey M, West G and Venkatesh S (1994), <i>"An investigation into the use of physical modelling for the prediction of various feature types visible from different view points"</i>, In Proceedings of the 2nd CAD-Based Vision Workshop. , pp. 282-290.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('robey1994investigation','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_robey1994investigation" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{robey1994investigation,
+  author = {Robey, M and West, GAW and Venkatesh, Svetha},
+  title = {An investigation into the use of physical modelling for the prediction of various feature types visible from different view points},
+  booktitle = {Proceedings of the 2nd CAD-Based Vision Workshop},
+  year = {1994},
+  pages = {282--290}
+}
+</pre></td>
+</tr>
+<tr id="robey1992determination" class="entry">
+	<td>Robey M, West G and Venkatesh S (1992), <i>"On the determination of all useful object features for 3D objects using physical models"</i>, In 5th Australian Joint Conference on Artificial Intelligence. , pp. 153-158.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('robey1992determination','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_robey1992determination" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{robey1992determination,
+  author = {Robey, M and West, G and Venkatesh, Svetha},
+  title = {On the determination of all useful object features for 3D objects using physical models},
+  booktitle = {5th Australian Joint Conference on Artificial Intelligence},
+  year = {1992},
+  pages = {153--158}
+}
+</pre></td>
+</tr>
+<tr id="robey1991general" class="entry">
+	<td>Robey M, West G and Venkatesh S (1991), <i>"General purpose viewpoint prediction algorithm"</i>, In DICTA 91: digital image computing: techniques and applications. 
+	<p class="infolinks"> [<a href="javascript:toggleInfo('robey1991general','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_robey1991general" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{robey1991general,
+  author = {Robey, M and West, G and Venkatesh, Svetha},
+  title = {General purpose viewpoint prediction algorithm},
+  booktitle = {DICTA 91: digital image computing: techniques and applications},
+  year = {1991}
+}
+</pre></td>
+</tr>
+<tr id="rosin1993extracting" class="entry">
+	<td>Rosin P and Venkatesh S (1993), <i>"Extracting natural scales using Fourier descriptors"</i>, Pattern Recognition.  Vol. 26(9), pp. 1383-1393. Elsevier.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('rosin1993extracting','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_rosin1993extracting" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{rosin1993extracting,
+  author = {Rosin, Paul and Venkatesh, Svetha},
+  title = {Extracting natural scales using Fourier descriptors},
+  journal = {Pattern Recognition},
+  publisher = {Elsevier},
+  year = {1993},
+  volume = {26},
+  number = {9},
+  pages = {1383--1393}
+}
+</pre></td>
+</tr>
+<tr id="rosin1992extracting" class="entry">
+	<td>Rosin P and Venkatesh S (1992), <i>"Extracting natural scales using fourier descriptors"</i>, In In 5th Australian Joint Conference on Artificial Intelligence. , pp. 16-18.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('rosin1992extracting','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_rosin1992extracting" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{rosin1992extracting,
+  author = {Rosin, P. and Venkatesh, Svetha.},
+  title = {Extracting natural scales using fourier descriptors},
+  booktitle = {In 5th Australian Joint Conference on Artificial Intelligence},
+  year = {1992},
+  pages = {16-18}
+}
+</pre></td>
+</tr>
+<tr id="santoso1999adaptive" class="entry">
+	<td>Santoso H, Kumar M and Venkatesh S (1999), <i>"Adaptive mpeg filtering for mobile computing environment"</i>, In ASV: Fifth Asian Symposium on Visualisation. , pp. 182-488.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('santoso1999adaptive','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_santoso1999adaptive" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{santoso1999adaptive,
+  author = {Santoso, H and Kumar, M and Venkatesh, Svetha},
+  title = {Adaptive mpeg filtering for mobile computing environment},
+  booktitle = {ASV: Fifth Asian Symposium on Visualisation},
+  year = {1999},
+  pages = {182--488}
+}
+</pre></td>
+</tr>
+<tr id="santoso1998qos" class="entry">
+	<td>Santoso H, Kumar M and Venkatesh S (1998), <i>"QOS Filtering for Video on Wireless Networks"</i>, In Multiaccess, Mobility and Teletraffic. , pp. 193-206. Springer.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('santoso1998qos','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_santoso1998qos" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@incollection{santoso1998qos,
+  author = {Santoso, Hanny and Kumar, M and Venkatesh, Svetha},
+  title = {QOS Filtering for Video on Wireless Networks},
+  booktitle = {Multiaccess, Mobility and Teletraffic},
+  publisher = {Springer},
+  year = {1998},
+  pages = {193--206}
+}
+</pre></td>
+</tr>
+<tr id="santoso1997novel" class="entry">
+	<td>Santoso H, Kumar M and Venkatesh S (1997), <i>"A novel scheme for maintaining QOS in mobile environments"</i>, In MICC: IEEE Malaysia International Conference on Communication. 
+	<p class="infolinks"> [<a href="javascript:toggleInfo('santoso1997novel','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_santoso1997novel" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{santoso1997novel,
+  author = {Santoso, H and Kumar, M and Venkatesh, Svetha},
+  title = {A novel scheme for maintaining QOS in mobile environments},
+  booktitle = {MICC: IEEE Malaysia International Conference on Communication},
+  year = {1997}
+}
+</pre></td>
+</tr>
+<tr id="shearer1999graph" class="entry">
+	<td>Shearer K, Bunke H and Venkatesh S (1999), <i>"Graph sequence matching by decision tree navigation"</i>, In 2nd IAPR-TC-15 Workshop on Graph-based Representations in Pattern Recognition. , pp. 99-108.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('shearer1999graph','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_shearer1999graph" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{shearer1999graph,
+  author = {Shearer, K and Bunke, H and Venkatesh, Svetha},
+  title = {Graph sequence matching by decision tree navigation},
+  booktitle = {2nd IAPR-TC-15 Workshop on Graph-based Representations in Pattern Recognition},
+  year = {1999},
+  pages = {99--108}
+}
+</pre></td>
+</tr>
+<tr id="Shearer1998" class="entry">
+	<td>Shearer K, Bunke H, Venkatesh S and Kieronska D (1998), <i>"Efficient graph matching for video indexing"</i>, Computing, Supp 2,. , pp. 53-62. Springer-Verlag.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('Shearer1998','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_Shearer1998" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{Shearer1998,
+  author = {Shearer, K and Bunke, H and Venkatesh, Svetha and Kieronska, D},
+  title = {Efficient graph matching for video indexing},
+  journal = {Computing, Supp 2,},
+  publisher = {Springer-Verlag},
+  year = {1998},
+  pages = {53--62}
+}
+</pre></td>
+</tr>
+<tr id="shearer1997efficient" class="entry">
+	<td>Shearer K, Bunke H, Venkatesh S and Kieronska D (1997), <i>"Efficient graph matching for video indexing"</i>, In IAPR TC15 Workshop on Graph based Representations. 
+	<p class="infolinks"> [<a href="javascript:toggleInfo('shearer1997efficient','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_shearer1997efficient" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{shearer1997efficient,
+  author = {Shearer, K and Bunke, H and Venkatesh, Svetha and Kieronska, D},
+  title = {Efficient graph matching for video indexing},
+  booktitle = {IAPR TC15 Workshop on Graph based Representations},
+  year = {1997}
+}
+</pre></td>
+</tr>
+<tr id="shearer1997resequencing" class="entry">
+	<td>Shearer K, Kieronska D and Venkatesh S (1997), <i>"Resequencing of video using spatial indexing"</i>, Journal of Visual Languages &amp; Computing.  Vol. 8(2), pp. 193-214. Elsevier.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('shearer1997resequencing','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_shearer1997resequencing" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{shearer1997resequencing,
+  author = {Shearer, Kim and Kieronska, Dorota and Venkatesh, Svetha},
+  title = {Resequencing of video using spatial indexing},
+  journal = {Journal of Visual Languages &amp; Computing},
+  publisher = {Elsevier},
+  year = {1997},
+  volume = {8},
+  number = {2},
+  pages = {193--214}
+}
+</pre></td>
+</tr>
+<tr id="shearer1995new" class="entry">
+	<td>Shearer K, Kieronska D and Venkatesh S (1995), <i>"A new algorithm for similarity retrieval in pictorial databases"</i>, In ADL: A Forum on Research and Technology Advances in Digital Libraries. 
+	<p class="infolinks"> [<a href="javascript:toggleInfo('shearer1995new','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_shearer1995new" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{shearer1995new,
+  author = {Shearer, K and Kieronska, D and Venkatesh, Svetha},
+  title = {A new algorithm for similarity retrieval in pictorial databases},
+  booktitle = {ADL: A Forum on Research and Technology Advances in Digital Libraries},
+  year = {1995}
+}
+</pre></td>
+</tr>
+<tr id="shearer1995two" class="entry">
+	<td>Shearer K, Kieronska DH and Venkatesh S (1995), <i>"Two-dimensional string notation for representing video sequences"</i>, In Digital Storage and Archiving Systems. , pp. 389-400.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('shearer1995two','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_shearer1995two" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{shearer1995two,
+  author = {Shearer, Kim and Kieronska, Dorota H and Venkatesh, Svetha},
+  title = {Two-dimensional string notation for representing video sequences},
+  booktitle = {Digital Storage and Archiving Systems},
+  year = {1995},
+  pages = {389--400}
+}
+</pre></td>
+</tr>
+<tr id="shearer1999detection" class="entry">
+	<td>Shearer K and Venkatesh S (1999), <i>"Detection of setting and subject information in documentary video"</i>, In IEEE International Conference on Multimedia Computing and Systems.  Vol. 1, pp. 797-801.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('shearer1999detection','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_shearer1999detection" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{shearer1999detection,
+  author = {Shearer, Kim and Venkatesh, Svetha},
+  title = {Detection of setting and subject information in documentary video},
+  booktitle = {IEEE International Conference on Multimedia Computing and Systems},
+  year = {1999},
+  volume = {1},
+  pages = {797--801}
+}
+</pre></td>
+</tr>
+<tr id="shearer1998rapid" class="entry">
+	<td>Shearer K and Venkatesh S (1998), <i>"Rapid isomorphism detection"</i>, In International Conference on Optimisation and Applications. , pp. 266-271.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('shearer1998rapid','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_shearer1998rapid" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{shearer1998rapid,
+  author = {Shearer,K and Venkatesh,S},
+  title = {Rapid isomorphism detection},
+  booktitle = {International Conference on Optimisation and Applications},
+  year = {1998},
+  pages = {266-271}
+}
+</pre></td>
+</tr>
+<tr id="shearer1998efficient" class="entry">
+	<td>Shearer K, Venkatesh S and Bunke H (1998), <i>"An efficient least common subgraph algorithm for video indexing"</i>, In Fourteenth International Conference on Pattern Recognition.  Vol. 2, pp. 1241-1243.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('shearer1998efficient','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_shearer1998efficient" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{shearer1998efficient,
+  author = {Shearer, Kim and Venkatesh, Svetha and Bunke, Horst},
+  title = {An efficient least common subgraph algorithm for video indexing},
+  booktitle = {Fourteenth International Conference on Pattern Recognition},
+  year = {1998},
+  volume = {2},
+  pages = {1241--1243}
+}
+</pre></td>
+</tr>
+<tr id="shearer1999automatic" class="entry">
+	<td>Shearer K, Venkatesh S and Dorai C (1999), <i>"Automatic isolation of speech in news footage for audio event detection"</i>, In 5th International Biennial Conference on Digital Image Computing, Techniques and Applications. , pp. 78-83.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('shearer1999automatic','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_shearer1999automatic" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{shearer1999automatic,
+  author = {Shearer, K and Venkatesh, Svetha and Dorai, C},
+  title = {Automatic isolation of speech in news footage for audio event detection},
+  booktitle = {5th International Biennial Conference on Digital Image Computing, Techniques and Applications},
+  year = {1999},
+  pages = {78--83}
+}
+</pre></td>
+</tr>
+<tr id="shearer1997visitors" class="entry">
+	<td>Shearer K, Venkatesh S and Kieronska D (1997), <i>"The visitors guide: a simple video reuse application"</i>, International Journal of Pattern Recognition and Artificial Intelligence.  Vol. 11(02), pp. 275-301. World Scientific.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('shearer1997visitors','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_shearer1997visitors" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{shearer1997visitors,
+  author = {Shearer, Kim and Venkatesh, Svetha and Kieronska, Dorota},
+  title = {The visitors guide: a simple video reuse application},
+  journal = {International Journal of Pattern Recognition and Artificial Intelligence},
+  publisher = {World Scientific},
+  year = {1997},
+  volume = {11},
+  number = {02},
+  pages = {275--301}
+}
+</pre></td>
+</tr>
+<tr id="shearer1996spatial" class="entry">
+	<td>Shearer K, Venkatesh S and Kieronska D (1996), <i>"Spatial indexing for video databases"</i>, Journal of Visual Communication and Image Representation.  Vol. 7(4), pp. 325-335. Elsevier.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('shearer1996spatial','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_shearer1996spatial" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{shearer1996spatial,
+  author = {Shearer, Kim and Venkatesh, Svetha and Kieronska, Dorota},
+  title = {Spatial indexing for video databases},
+  journal = {Journal of Visual Communication and Image Representation},
+  publisher = {Elsevier},
+  year = {1996},
+  volume = {7},
+  number = {4},
+  pages = {325--335}
+}
+</pre></td>
+</tr>
+<tr id="shearer1995user" class="entry">
+	<td>Shearer K, Venkatesh S and Kieronska D (1995), <i>"User queries and underlying 2d string representation"</i>, In International Symposium on Information, Communications and Computer Technologies, Applications and Systems.  Vol. 2606, pp. 389-400.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('shearer1995user','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_shearer1995user" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{shearer1995user,
+  author = {Shearer, K and Venkatesh, Svetha and Kieronska, D},
+  title = {User queries and underlying 2d string representation},
+  booktitle = {International Symposium on Information, Communications and Computer Technologies, Applications and Systems},
+  year = {1995},
+  volume = {2606},
+  pages = {389--400}
+}
+</pre></td>
+</tr>
+<tr id="shearer1997composite" class="entry">
+	<td>Shearer K, Wong K and Venkatesh S (1997), <i>"Composite tracking systems from complementary algorithms"</i>, In Digital Image Computing, Techniques and Applications. , pp. 391-397.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('shearer1997composite','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_shearer1997composite" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{shearer1997composite,
+  author = {Shearer, K and Wong, K and Venkatesh, Svetha},
+  title = {Composite tracking systems from complementary algorithms},
+  booktitle = {Digital Image Computing, Techniques and Applications},
+  year = {1997},
+  pages = {391--397}
+}
+</pre></td>
+</tr>
+<tr id="smith1997conceptual" class="entry">
+	<td>Smith RW, Kieronska D and Venkatesh S (1997), <i>"Conceptual representation for multimedia information"</i>, International journal of pattern recognition and artificial intelligence.  Vol. 11(02), pp. 303-327. World Scientific.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('smith1997conceptual','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_smith1997conceptual" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{smith1997conceptual,
+  author = {Smith, Roger W and Kieronska, Dorota and Venkatesh, Svetha},
+  title = {Conceptual representation for multimedia information},
+  journal = {International journal of pattern recognition and artificial intelligence},
+  publisher = {World Scientific},
+  year = {1997},
+  volume = {11},
+  number = {02},
+  pages = {303--327}
+}
+</pre></td>
+</tr>
+<tr id="smith1997overview" class="entry">
+	<td>Smith S, Venkatesh S and Kieronska D (1997), <i>"Overview of a knowledge modelling tool: Noetica"</i>, Australian journal of intelligent information processing systems.  Vol. 4(1), pp. 12-21. Australian National University, Department of Computer Science, College of Engineering and Computer Science.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('smith1997overview','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_smith1997overview" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{smith1997overview,
+  author = {Smith, S and Venkatesh, Svetha and Kieronska, D},
+  title = {Overview of a knowledge modelling tool: Noetica},
+  journal = {Australian journal of intelligent information processing systems},
+  publisher = {Australian National University, Department of Computer Science, College of Engineering and Computer Science},
+  year = {1997},
+  volume = {4},
+  number = {1},
+  pages = {12--21}
+}
+</pre></td>
+</tr>
+<tr id="srinivasan1999robot" class="entry">
+	<td>Srinivasan MV, Chahl JS, Weber K, Venkatesh S, Nagle MG and Zhang S-W (1999), <i>"Robot navigation inspired by principles of insect vision"</i>, Robotics and Autonomous Systems.  Vol. 26(2), pp. 203-216. Elsevier.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('srinivasan1999robot','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_srinivasan1999robot" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{srinivasan1999robot,
+  author = {Srinivasan, Mandyam V and Chahl, Javaan S and Weber, Keven and Venkatesh, Svetha and Nagle, Martin G and Zhang, Shao-Wu},
+  title = {Robot navigation inspired by principles of insect vision},
+  journal = {Robotics and Autonomous Systems},
+  publisher = {Elsevier},
+  year = {1999},
+  volume = {26},
+  number = {2},
+  pages = {203--216}
+}
+</pre></td>
+</tr>
+<tr id="srinivasan1997living" class="entry">
+	<td>Srinivasan MV and Venkatesh S (1997), <i>"From living eyes to seeing machines"</i>  Oxford University Press Oxford.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('srinivasan1997living','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_srinivasan1997living" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@book{srinivasan1997living,
+  author = {Srinivasan, Mandyam V and Venkatesh, Svetha},
+  title = {From living eyes to seeing machines},
+  publisher = {Oxford University Press Oxford},
+  year = {1997}
+}
+</pre></td>
+</tr>
+<tr id="srinivasan1997qualitative" class="entry">
+	<td>Srinivasan MV, Venkatesh S and Hosie R (1997), <i>"Qualitative estimation of camera motion parameters from video sequences"</i>, Pattern Recognition.  Vol. 30(4), pp. 593-606. Elsevier.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('srinivasan1997qualitative','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_srinivasan1997qualitative" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{srinivasan1997qualitative,
+  author = {Srinivasan, Mandyam V and Venkatesh, Svetha and Hosie, Robin},
+  title = {Qualitative estimation of camera motion parameters from video sequences},
+  journal = {Pattern Recognition},
+  publisher = {Elsevier},
+  year = {1997},
+  volume = {30},
+  number = {4},
+  pages = {593--606}
+}
+</pre></td>
+</tr>
+<tr id="venkatesh1994survey" class="entry">
+	<td>Svetha V and Kumar M (1994), <i>"A survey of shared memory systems"</i>, Computer Science and Informatics.  Vol. 24(3), pp. 1-13.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('venkatesh1994survey','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_venkatesh1994survey" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{venkatesh1994survey,
+  author = {Venkatesh Svetha and Kumar, M},
+  title = {A survey of shared memory systems},
+  journal = {Computer Science and Informatics},
+  year = {1994},
+  volume = {24},
+  number = {3},
+  pages = {1-13}
+}
+</pre></td>
+</tr>
+<tr id="takatsuka1999schematics" class="entry">
+	<td>Takatsuka M, Caelli T, West G and Venkatesh S (1999), <i>"Schematics and 3d object interpretation using symbolic representation and distributed matching strategies"</i>, In GREC'99: Third International Workshop on Graphics Recognition. , pp. 236-306.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('takatsuka1999schematics','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_takatsuka1999schematics" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{takatsuka1999schematics,
+  author = {Takatsuka, M and Caelli, T and West, G and Venkatesh, Svetha},
+  title = {Schematics and 3d object interpretation using symbolic representation and distributed matching strategies},
+  booktitle = {GREC'99: Third International Workshop on Graphics Recognition},
+  year = {1999},
+  pages = {236-306}
+}
+</pre></td>
+</tr>
+<tr id="takatsuka1999symbolic" class="entry">
+	<td>Takatsuka M, Caelli TM, West GA and Venkatesh S (1999), <i>"Symbolic representation and distributed matching strategies for schematics"</i>, In Fifth International Conference on Document Analysis and Recognition. , pp. 693-696.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('takatsuka1999symbolic','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_takatsuka1999symbolic" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{takatsuka1999symbolic,
+  author = {Takatsuka, Masahiro and Caelli, Terry M and West, Geoff AW and Venkatesh, Svetha},
+  title = {Symbolic representation and distributed matching strategies for schematics},
+  booktitle = {Fifth International Conference on Document Analysis and Recognition},
+  year = {1999},
+  pages = {693--696}
+}
+</pre></td>
+</tr>
+<tr id="takatsuka1999low" class="entry">
+	<td>Takatsuka M, West GA, Venkatesh S and Caelli TM (1999), <i>"Low-cost interactive active monocular range finder"</i>, In IEEE Computer Society Conference on Computer Vision and Pattern Recognition.  Vol. 1, pp. 444-449.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('takatsuka1999low','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_takatsuka1999low" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{takatsuka1999low,
+  author = {Takatsuka, Masahiro and West, Geoff AW and Venkatesh, Svetha and Caelli, Terry M},
+  title = {Low-cost interactive active monocular range finder},
+  booktitle = {IEEE Computer Society Conference on Computer Vision and Pattern Recognition},
+  year = {1999},
+  volume = {1},
+  pages = {444--449}
+}
+</pre></td>
+</tr>
+<tr id="tan1996betagraph" class="entry">
+	<td>Tan D, Venkatesh S and West G (1996), <i>"Betagraph exploitation for improvement of mpeg video compression"</i>, In Digital Video Compression : Algorithms and Technologies. , pp. 154-168.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('tan1996betagraph','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_tan1996betagraph" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{tan1996betagraph,
+  author = {Tan, D and Venkatesh, Svetha and West, G.A.W.},
+  title = {Betagraph exploitation for improvement of mpeg video compression},
+  booktitle = {Digital Video Compression : Algorithms and Technologies},
+  year = {1996},
+  pages = {154--168}
+}
+</pre></td>
+</tr>
+<tr id="travers1993deriving" class="entry">
+	<td>Travers A, Kieronska D and Venkatesh S (1993), <i>"Deriving ambiguous spatial relations"</i>, In Fourth Annual Conference: AI, simulation and planning in high automony systems. , pp. 47-53.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('travers1993deriving','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_travers1993deriving" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{travers1993deriving,
+  author = {Travers, Anthony and Kieronska, Dorota and Venkatesh, Svetha},
+  title = {Deriving ambiguous spatial relations},
+  booktitle = {Fourth Annual Conference: AI, simulation and planning in high automony systems},
+  year = {1993},
+  pages = {47--53}
+}
+</pre></td>
+</tr>
+<tr id="travers1995point" class="entry">
+	<td>Travers A, Venkatesh S and Kieronska D (1995), <i>"A point-based representation for intervals"</i>, In Third Australian and New Zealand Conference on Intelligent Information Systems. , pp. 169-174.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('travers1995point','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_travers1995point" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{travers1995point,
+  author = {Travers, Anthony and Venkatesh, Svetha and Kieronska, Dorota},
+  title = {A point-based representation for intervals},
+  booktitle = {Third Australian and New Zealand Conference on Intelligent Information Systems},
+  year = {1995},
+  pages = {169--174}
+}
+</pre></td>
+</tr>
+<tr id="travers1994topology" class="entry">
+	<td>Travers S, Venkatesh S and Kieronska D (1994), <i>"Topology + order = spatial relation"</i>, In American Association of Artificial Intelligence (AAAI'94) Workshop on Spatial and Temporal Reasoning. , pp. 161-166.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('travers1994topology','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_travers1994topology" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{travers1994topology,
+  author = {Travers, S and Venkatesh, Svetha and Kieronska, D},
+  title = {Topology + order = spatial relation},
+  booktitle = {American Association of Artificial Intelligence (AAAI'94) Workshop on Spatial and Temporal Reasoning},
+  year = {1994},
+  pages = {161-166}
+}
+</pre></td>
+</tr>
+<tr id="travers1991autonomous" class="entry">
+	<td>Travers T, Kieronska D and Venkatesh S (1991), <i>"An autonomous agent planning for survival in a complex environment"</i>, In Situation Awareness Workshop at International Joint Conference on Artificial Intelligence (IJCAI). 
+	<p class="infolinks"> [<a href="javascript:toggleInfo('travers1991autonomous','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_travers1991autonomous" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{travers1991autonomous,
+  author = {Travers, T. and Kieronska, D and Venkatesh, Svetha},
+  title = {An autonomous agent planning for survival in a complex environment},
+  booktitle = {Situation Awareness Workshop at International Joint Conference on Artificial Intelligence (IJCAI)},
+  year = {1991}
+}
+</pre></td>
+</tr>
+<tr id="tuah1999performance" class="entry">
+	<td>Tuah NJ, Kumar M and Venkatesh S (1999), <i>"A performance model of speculative prefetching in distributed information systems"</i>, In 13th International and 10th Symposium on Parallel and Distributed Processing, IPPS/SPDP. , pp. 75-80.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('tuah1999performance','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_tuah1999performance" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{tuah1999performance,
+  author = {Tuah, Nor Jaidi and Kumar, Mohan and Venkatesh, Svetha},
+  title = {A performance model of speculative prefetching in distributed information systems},
+  booktitle = {13th International and 10th Symposium on Parallel and Distributed Processing, IPPS/SPDP},
+  year = {1999},
+  pages = {75--80}
+}
+</pre></td>
+</tr>
+<tr id="tuah1998investigation" class="entry">
+	<td>Tuah NJ, Kumar M and Venkatesh S (1998), <i>"Investigation of a prefetch model for low bandwidth networks"</i>, In 1st ACM International Workshop on Wireless Mobile Multimedia. , pp. 38-47.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('tuah1998investigation','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_tuah1998investigation" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{tuah1998investigation,
+  author = {Tuah, Nor Jaidi and Kumar, Mohan and Venkatesh, Svetha},
+  title = {Investigation of a prefetch model for low bandwidth networks},
+  booktitle = {1st ACM International Workshop on Wireless Mobile Multimedia},
+  year = {1998},
+  pages = {38--47}
+}
+</pre></td>
+</tr>
+<tr id="venkatesh1995local" class="entry">
+	<td>Venkatesh S, Cooper J and White B (1995), <i>"Local energy, the pre-envelope and filter resolution"</i>, Pattern Recognition.  Vol. 28(8), pp. 1127-1134.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('venkatesh1995local','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_venkatesh1995local" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{venkatesh1995local,
+  author = {Venkatesh, Svetha and Cooper, James and White, Brian},
+  title = {Local energy, the pre-envelope and filter resolution},
+  journal = {Pattern Recognition},
+  year = {1995},
+  volume = {28},
+  number = {8},
+  pages = {1127-1134}
+}
+</pre></td>
+</tr>
+<tr id="venkatesh1992local" class="entry">
+	<td>Venkatesh S, Cooper J and White B (1992), <i>"Local energy, the pre-envelope, and filter resolution"</i>, In 11th IAPR International Conference on Pattern Recognition: Image, Speech and Signal Analysis. , pp. 13-17.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('venkatesh1992local','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_venkatesh1992local" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{venkatesh1992local,
+  author = {Venkatesh, Svetha and Cooper, James and White, Brian},
+  title = {Local energy, the pre-envelope, and filter resolution},
+  booktitle = {11th IAPR International Conference on Pattern Recognition: Image, Speech and Signal Analysis},
+  year = {1992},
+  pages = {13--17}
+}
+</pre></td>
+</tr>
+<tr id="venkatesh1991local" class="entry">
+	<td>Venkatesh S, Cooper J and White B (1991), <i>"Local energy and multiresolution"</i>, In 1st Conference on Digital Image Computing, Techniques and Applications. 
+	<p class="infolinks"> [<a href="javascript:toggleInfo('venkatesh1991local','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_venkatesh1991local" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{venkatesh1991local,
+  author = {Venkatesh, Svetha and Cooper, J and White, B.},
+  title = {Local energy and multiresolution},
+  booktitle = {1st Conference on Digital Image Computing, Techniques and Applications},
+  year = {1991}
+}
+</pre></td>
+</tr>
+<tr id="venkatesh1995indexing" class="entry">
+	<td>Venkatesh S and Kieronska D (1995), <i>"Indexing of multimedia data"</i>, In First International Conference on Indexers Partners in publishing. , pp. 31-37.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('venkatesh1995indexing','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_venkatesh1995indexing" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{venkatesh1995indexing,
+  author = {Venkatesh, Svetha and Kieronska, D},
+  title = {Indexing of multimedia data},
+  booktitle = {First International Conference on Indexers Partners in publishing},
+  year = {1995},
+  pages = {31-37}
+}
+</pre></td>
+</tr>
+<tr id="venkatesh1994distributed" class="entry">
+	<td>Venkatesh S and Kieronska D (1994), <i>"Distributed quad tree processing of vector data"</i>, In IWPP: First International Workshop on Parallel Processing. , pp. 26-31.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('venkatesh1994distributed','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_venkatesh1994distributed" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{venkatesh1994distributed,
+  author = {Venkatesh, Svetha and Kieronska, D},
+  title = {Distributed quad tree processing of vector data},
+  booktitle = {IWPP: First International Workshop on Parallel Processing},
+  year = {1994},
+  pages = {26--31}
+}
+</pre></td>
+</tr>
+<tr id="venkatesh1994landmark" class="entry">
+	<td>Venkatesh S and Kieronska D (1994), <i>"Landmark based representation of road maps and navigation plans"</i>, Journal of information science and technology.  Vol. 3(2), pp. 163-175. The Information Institute.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('venkatesh1994landmark','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_venkatesh1994landmark" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{venkatesh1994landmark,
+  author = {Venkatesh, Svetha and Kieronska, D},
+  title = {Landmark based representation of road maps and navigation plans},
+  journal = {Journal of information science and technology},
+  publisher = {The Information Institute},
+  year = {1994},
+  volume = {3},
+  number = {2},
+  pages = {163--175}
+}
+</pre></td>
+</tr>
+<tr id="venkatesh1994unified" class="entry">
+	<td>Venkatesh S and Kieronska D (1994), <i>"A unified formalism for landmark based representation of maps and navigation plans"</i>, In Fuzzy Logic and Fuzzy Control. , pp. 123-132. Springer.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('venkatesh1994unified','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_venkatesh1994unified" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@incollection{venkatesh1994unified,
+  author = {Venkatesh, Svetha and Kieronska, Dorota},
+  title = {A unified formalism for landmark based representation of maps and navigation plans},
+  booktitle = {Fuzzy Logic and Fuzzy Control},
+  publisher = {Springer},
+  year = {1994},
+  pages = {123--132}
+}
+</pre></td>
+</tr>
+<tr id="venkatesh1993maps" class="entry">
+	<td>Venkatesh S and Kieronska D (1993), <i>"Maps for mobile agents: representing spatial knowledge"</i>, In International Symposium on Artificial Intelligence, The Artificial Intelligence Technology Transfer Conference. , pp. 325-330.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('venkatesh1993maps','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_venkatesh1993maps" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{venkatesh1993maps,
+  author = {Venkatesh, Svetha and Kieronska, Dorota},
+  title = {Maps for mobile agents: representing spatial knowledge},
+  booktitle = {International Symposium on Artificial Intelligence, The Artificial Intelligence Technology Transfer Conference},
+  year = {1993},
+  pages = {325--330}
+}
+</pre></td>
+</tr>
+<tr id="venkatesh1993planning" class="entry">
+	<td>Venkatesh S and Kieronska D (1993), <i>"Planning with spatial primitives"</i>, In Australia and New Zealand Conference on Intelligent Information Systems. , pp. 718-722.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('venkatesh1993planning','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_venkatesh1993planning" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{venkatesh1993planning,
+  author = {Venkatesh, Svetha and Kieronska, Dorota},
+  title = {Planning with spatial primitives},
+  booktitle = {Australia and New Zealand Conference on Intelligent Information Systems},
+  year = {1993},
+  pages = {718-722}
+}
+</pre></td>
+</tr>
+<tr id="Svetha1992" class="entry">
+	<td>Venkatesh S and Kieronska D (1992), <i>"Spatial reasoning using active observation"</i>, In 3rd Annual Conference on Artificial Intelligence, Planning and High Autonomy Systems. , pp. 147-153.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('Svetha1992','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_Svetha1992" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{Svetha1992,
+  author = {Venkatesh, Svetha and Kieronska, D.H.},
+  title = {Spatial reasoning using active observation},
+  booktitle = {3rd Annual Conference on Artificial Intelligence, Planning and High Autonomy Systems},
+  year = {1992},
+  pages = {147-153}
+}
+</pre></td>
+</tr>
+<tr id="venkatesh1992spatial" class="entry">
+	<td>Venkatesh S and Kieronska D (1992), <i>"Spatial reasoning for intelligent navigation"</i>, In ICARCV 1992: Second International Conference on Automation, Robotics and Computer Vision. 
+	<p class="infolinks"> [<a href="javascript:toggleInfo('venkatesh1992spatial','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_venkatesh1992spatial" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{venkatesh1992spatial,
+  author = {Venkatesh, Svetha and Kieronska, D},
+  title = {Spatial reasoning for intelligent navigation},
+  booktitle = {ICARCV 1992: Second International Conference on Automation, Robotics and Computer Vision},
+  year = {1992}
+}
+</pre></td>
+</tr>
+<tr id="venkatesh1991landmark" class="entry">
+	<td>Venkatesh S and Kieronska D (1991), <i>"Landmark based representation of road maps and navigation plans"</i>, In Fuzzy Logic in AI Workshop in International Joint Conference on Artificial Intelligence (IJCAI). 
+	<p class="infolinks"> [<a href="javascript:toggleInfo('venkatesh1991landmark','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_venkatesh1991landmark" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{venkatesh1991landmark,
+  author = {Venkatesh, Svetha and Kieronska, D},
+  title = {Landmark based representation of road maps and navigation plans},
+  booktitle = {Fuzzy Logic in AI Workshop in International Joint Conference on Artificial Intelligence (IJCAI)},
+  year = {1991}
+}
+</pre></td>
+</tr>
+<tr id="venkatesh1995spatial" class="entry">
+	<td>Venkatesh S, Kieronska D and Smith S (1995), <i>"Spatial reasoning via active observation"</i>, Applied Artificial Intelligence an International Journal.  Vol. 9(5), pp. 495-524. Taylor &amp; Francis.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('venkatesh1995spatial','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_venkatesh1995spatial" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{venkatesh1995spatial,
+  author = {Venkatesh, Svetha and Kieronska, Dorota and Smith, Stewart},
+  title = {Spatial reasoning via active observation},
+  journal = {Applied Artificial Intelligence an International Journal},
+  publisher = {Taylor &amp; Francis},
+  year = {1995},
+  volume = {9},
+  number = {5},
+  pages = {495--524}
+}
+</pre></td>
+</tr>
+<tr id="venkatesh1990texture" class="entry">
+	<td>Venkatesh S and Kitchen L (1990), <i>"Texture factorization: variant and invariant description"</i>, In AI 1990: 4th Australian Joint Conference on Artificial Intelligence. , pp. 639-652.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('venkatesh1990texture','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_venkatesh1990texture" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{venkatesh1990texture,
+  author = {Venkatesh, Svetha and Kitchen, LJ},
+  title = {Texture factorization: variant and invariant description},
+  booktitle = {AI 1990: 4th Australian Joint Conference on Artificial Intelligence},
+  year = {1990},
+  pages = {639--652}
+}
+</pre></td>
+</tr>
+<tr id="venkatesh1992edge" class="entry">
+	<td>Venkatesh S and Kitchen LJ (1992), <i>"Edge evaluation using necessary components"</i>, CVGIP: Graphical Models and Image Processing.  Vol. 54(1), pp. 23-30. Elsevier.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('venkatesh1992edge','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_venkatesh1992edge" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{venkatesh1992edge,
+  author = {Venkatesh, Svetha and Kitchen, Leslie John},
+  title = {Edge evaluation using necessary components},
+  journal = {CVGIP: Graphical Models and Image Processing},
+  publisher = {Elsevier},
+  year = {1992},
+  volume = {54},
+  number = {1},
+  pages = {23--30}
+}
+</pre></td>
+</tr>
+<tr id="venkatesh1990classification" class="entry">
+	<td>Venkatesh S and Owens R (1990), <i>"On the classification of image features"</i>, Pattern Recognition Letters.  Vol. 11(5), pp. 339-349. Elsevier.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('venkatesh1990classification','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_venkatesh1990classification" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{venkatesh1990classification,
+  author = {Venkatesh, Svetha and Owens, Robyn},
+  title = {On the classification of image features},
+  journal = {Pattern Recognition Letters},
+  publisher = {Elsevier},
+  year = {1990},
+  volume = {11},
+  number = {5},
+  pages = {339--349}
+}
+</pre></td>
+</tr>
+<tr id="venkatesh1995dynamic" class="entry">
+	<td>Venkatesh S and Rosin PL (1995), <i>"Dynamic threshold determination by local and global edge evaluation"</i>, Graphical models and image processing.  Vol. 57(2), pp. 146-160. Elsevier.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('venkatesh1995dynamic','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_venkatesh1995dynamic" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{venkatesh1995dynamic,
+  author = {Venkatesh, Svetha and Rosin, Paul L},
+  title = {Dynamic threshold determination by local and global edge evaluation},
+  journal = {Graphical models and image processing},
+  publisher = {Elsevier},
+  year = {1995},
+  volume = {57},
+  number = {2},
+  pages = {146--160}
+}
+</pre></td>
+</tr>
+<tr id="venkatesh1993dynamic" class="entry">
+	<td>Venkatesh S and Rosin PL (1993), <i>"Dynamic-threshold determination by local and global edge evaluation"</i>, In SPIE; Applications of AI 1993; Machine Vison and Robotics. , pp. 40-50.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('venkatesh1993dynamic','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_venkatesh1993dynamic" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{venkatesh1993dynamic,
+  author = {Venkatesh, Svetha and Rosin, Paul L},
+  title = {Dynamic-threshold determination by local and global edge evaluation},
+  booktitle = {SPIE; Applications of AI 1993; Machine Vison and Robotics},
+  year = {1993},
+  pages = {40--50}
+}
+</pre></td>
+</tr>
+<tr id="weber1994insect" class="entry">
+	<td>Weber K, Venkatesh S and Kieronska D (1994), <i>"Insect based navigation and its applications to the autonomous control of mobile robots"</i>, In ICARCV: Third International Conference on Automation, Robotics and Computer Vision. , pp. 1228-1232.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('weber1994insect','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_weber1994insect" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{weber1994insect,
+  author = {Weber, K and Venkatesh, Svetha and Kieronska, D},
+  title = {Insect based navigation and its applications to the autonomous control of mobile robots},
+  booktitle = {ICARCV: Third International Conference on Automation, Robotics and Computer Vision},
+  year = {1994},
+  pages = {1228--1232}
+}
+</pre></td>
+</tr>
+<tr id="weber1999insect" class="entry">
+	<td>Weber K, Venkatesh S and Srinivasan M (1999), <i>"Insect-inspired robotic homing"</i>, Adaptive Behavior.  Vol. 7(1), pp. 65-97. Sage Publications.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('weber1999insect','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_weber1999insect" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{weber1999insect,
+  author = {Weber, Keven and Venkatesh, Svetha and Srinivasan, Mandyam},
+  title = {Insect-inspired robotic homing},
+  journal = {Adaptive Behavior},
+  publisher = {Sage Publications},
+  year = {1999},
+  volume = {7},
+  number = {1},
+  pages = {65--97}
+}
+</pre></td>
+</tr>
+<tr id="weber1998insect" class="entry">
+	<td>Weber K, Venkatesh S and Srinivasan M (1998), <i>"An insect-based approach to robotic homing"</i>, In Fourteenth International Conference on Pattern Recognition.  Vol. 1, pp. 297-299.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('weber1998insect','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_weber1998insect" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{weber1998insect,
+  author = {Weber, Keven and Venkatesh, Svetha and Srinivasan, MV},
+  title = {An insect-based approach to robotic homing},
+  booktitle = {Fourteenth International Conference on Pattern Recognition},
+  year = {1998},
+  volume = {1},
+  pages = {297--299}
+}
+</pre></td>
+</tr>
+<tr id="weber1996insect" class="entry">
+	<td>Weber K, Venkatesh S and Srinivasan M (1996), <i>"Insect inspired behaviours for the autonomous control of mobile robots"</i>, In 13th International Conference on Pattern Recognition.  Vol. 1, pp. 156-160.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('weber1996insect','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_weber1996insect" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{weber1996insect,
+  author = {Weber, K and Venkatesh, Svetha and Srinivasan, MV},
+  title = {Insect inspired behaviours for the autonomous control of mobile robots},
+  booktitle = {13th International Conference on Pattern Recognition},
+  year = {1996},
+  volume = {1},
+  pages = {156--160}
+}
+</pre></td>
+</tr>
+<tr id="weber1996landmark" class="entry">
+	<td>Weber K, Venkatesh S and Srinivasan M (1996), <i>"Landmark based corridor navigation"</i>, In International Conference on Automation,Robotics and Computer Vision. , pp. 272-276.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('weber1996landmark','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_weber1996landmark" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{weber1996landmark,
+  author = {Weber, K and Venkatesh, Svetha and Srinivasan, MV},
+  title = {Landmark based corridor navigation},
+  booktitle = {International Conference on Automation,Robotics and Computer Vision},
+  year = {1996},
+  pages = {272-276}
+}
+</pre></td>
+</tr>
+</tbody>
+</table>
+<footer>
+ <small>Created by <a href="http://jabref.sourceforge.net">JabRef</a> on 04/12/2017.</small>
+</footer>
+<!-- file generated by JabRef -->
+</body>
+</html>

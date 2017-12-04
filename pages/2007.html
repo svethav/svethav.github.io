@@ -1,0 +1,798 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<title>JabRef references</title>
+<meta http-equiv="Content-Type" content="text/html; charset=windows-1252">
+<script type="text/javascript">
+<!--
+// QuickSearch script for JabRef HTML export 
+// Version: 3.0
+//
+// Copyright (c) 2006-2011, Mark Schenk
+//
+// This software is distributed under a Creative Commons Attribution 3.0 License
+// http://creativecommons.org/licenses/by/3.0/
+//
+// Features:
+// - intuitive find-as-you-type searching
+//    ~ case insensitive
+//    ~ ignore diacritics (optional)
+//
+// - search with/without Regular Expressions
+// - match BibTeX key
+//
+
+// Search settings
+var searchAbstract = true;	// search in abstract
+var searchReview = true;	// search in review
+
+var noSquiggles = true; 	// ignore diacritics when searching
+var searchRegExp = false; 	// enable RegExp searches
+
+
+if (window.addEventListener) {
+	window.addEventListener("load",initSearch,false); }
+else if (window.attachEvent) {
+	window.attachEvent("onload", initSearch); }
+
+function initSearch() {
+	// check for quick search table and searchfield
+	if (!document.getElementById('qs_table')||!document.getElementById('quicksearch')) { return; }
+
+	// load all the rows and sort into arrays
+	loadTableData();
+	
+	//find the query field
+	qsfield = document.getElementById('qs_field');
+
+	// previous search term; used for speed optimisation
+	prevSearch = '';
+
+	//find statistics location
+	stats = document.getElementById('stat');
+	setStatistics(-1);
+	
+	// set up preferences
+	initPreferences();
+
+	// shows the searchfield
+	document.getElementById('quicksearch').style.display = 'block';
+	document.getElementById('qs_field').onkeyup = quickSearch;
+}
+
+function loadTableData() {
+	// find table and appropriate rows
+	searchTable = document.getElementById('qs_table');
+	var allRows = searchTable.getElementsByTagName('tbody')[0].getElementsByTagName('tr');
+
+	// split all rows into entryRows and infoRows (e.g. abstract, review, bibtex)
+	entryRows = new Array(); infoRows = new Array(); absRows = new Array(); revRows = new Array();
+
+	// get data from each row
+	entryRowsData = new Array(); absRowsData = new Array(); revRowsData = new Array(); 
+	
+	BibTeXKeys = new Array();
+	
+	for (var i=0, k=0, j=0; i<allRows.length;i++) {
+		if (allRows[i].className.match(/entry/)) {
+			entryRows[j] = allRows[i];
+			entryRowsData[j] = stripDiacritics(getTextContent(allRows[i]));
+			allRows[i].id ? BibTeXKeys[j] = allRows[i].id : allRows[i].id = 'autokey_'+j;
+			j ++;
+		} else {
+			infoRows[k++] = allRows[i];
+			// check for abstract/review
+			if (allRows[i].className.match(/abstract/)) {
+				absRows.push(allRows[i]);
+				absRowsData[j-1] = stripDiacritics(getTextContent(allRows[i]));
+			} else if (allRows[i].className.match(/review/)) {
+				revRows.push(allRows[i]);
+				revRowsData[j-1] = stripDiacritics(getTextContent(allRows[i]));
+			}
+		}
+	}
+	//number of entries and rows
+	numEntries = entryRows.length;
+	numInfo = infoRows.length;
+	numAbs = absRows.length;
+	numRev = revRows.length;
+}
+
+function quickSearch(){
+	
+	tInput = qsfield;
+
+	if (tInput.value.length == 0) {
+		showAll();
+		setStatistics(-1);
+		qsfield.className = '';
+		return;
+	} else {
+		t = stripDiacritics(tInput.value);
+
+		if(!searchRegExp) { t = escapeRegExp(t); }
+			
+		// only search for valid RegExp
+		try {
+			textRegExp = new RegExp(t,"i");
+			closeAllInfo();
+			qsfield.className = '';
+		}
+			catch(err) {
+			prevSearch = tInput.value;
+			qsfield.className = 'invalidsearch';
+			return;
+		}
+	}
+	
+	// count number of hits
+	var hits = 0;
+
+	// start looping through all entry rows
+	for (var i = 0; cRow = entryRows[i]; i++){
+
+		// only show search the cells if it isn't already hidden OR if the search term is getting shorter, then search all
+		if(cRow.className.indexOf('noshow')==-1 || tInput.value.length <= prevSearch.length){
+			var found = false; 
+
+			if (entryRowsData[i].search(textRegExp) != -1 || BibTeXKeys[i].search(textRegExp) != -1){ 
+				found = true;
+			} else {
+				if(searchAbstract && absRowsData[i]!=undefined) {
+					if (absRowsData[i].search(textRegExp) != -1){ found=true; } 
+				}
+				if(searchReview && revRowsData[i]!=undefined) {
+					if (revRowsData[i].search(textRegExp) != -1){ found=true; } 
+				}
+			}
+			
+			if (found){
+				cRow.className = 'entry show';
+				hits++;
+			} else {
+				cRow.className = 'entry noshow';
+			}
+		}
+	}
+
+	// update statistics
+	setStatistics(hits)
+	
+	// set previous search value
+	prevSearch = tInput.value;
+}
+
+
+// Strip Diacritics from text
+// http://stackoverflow.com/questions/990904/javascript-remove-accents-in-strings
+
+// String containing replacement characters for stripping accents 
+var stripstring = 
+    'AAAAAAACEEEEIIII'+
+    'DNOOOOO.OUUUUY..'+
+    'aaaaaaaceeeeiiii'+
+    'dnooooo.ouuuuy.y'+
+    'AaAaAaCcCcCcCcDd'+
+    'DdEeEeEeEeEeGgGg'+
+    'GgGgHhHhIiIiIiIi'+
+    'IiIiJjKkkLlLlLlL'+
+    'lJlNnNnNnnNnOoOo'+
+    'OoOoRrRrRrSsSsSs'+
+    'SsTtTtTtUuUuUuUu'+
+    'UuUuWwYyYZzZzZz.';
+
+function stripDiacritics(str){
+
+    if(noSquiggles==false){
+        return str;
+    }
+
+    var answer='';
+    for(var i=0;i<str.length;i++){
+        var ch=str[i];
+        var chindex=ch.charCodeAt(0)-192;   // Index of character code in the strip string
+        if(chindex>=0 && chindex<stripstring.length){
+            // Character is within our table, so we can strip the accent...
+            var outch=stripstring.charAt(chindex);
+            // ...unless it was shown as a '.'
+            if(outch!='.')ch=outch;
+        }
+        answer+=ch;
+    }
+    return answer;
+}
+
+// http://stackoverflow.com/questions/3446170/escape-string-for-use-in-javascript-regex
+// NOTE: must escape every \ in the export code because of the JabRef Export...
+function escapeRegExp(str) {
+  return str.replace(/[-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, "\\$&");
+}
+
+function toggleInfo(articleid,info) {
+
+	var entry = document.getElementById(articleid);
+	var abs = document.getElementById('abs_'+articleid);
+	var rev = document.getElementById('rev_'+articleid);
+	var bib = document.getElementById('bib_'+articleid);
+	
+	if (abs && info == 'abstract') {
+		abs.className.indexOf('noshow') == -1?abs.className = 'abstract noshow':abs.className = 'abstract show';
+	} else if (rev && info == 'review') {
+		rev.className.indexOf('noshow') == -1?rev.className = 'review noshow':rev.className = 'review show';
+	} else if (bib && info == 'bibtex') {
+		bib.className.indexOf('noshow') == -1?bib.className = 'bibtex noshow':bib.className = 'bibtex show';
+	} else { 
+		return;
+	}
+
+	// check if one or the other is available
+	var revshow; var absshow; var bibshow;
+	(abs && abs.className.indexOf('noshow') == -1)? absshow = true: absshow = false;
+	(rev && rev.className.indexOf('noshow') == -1)? revshow = true: revshow = false;	
+	(bib && bib.className.indexOf('noshow') == -1)? bibshow = true: bibshow = false;
+	
+	// highlight original entry
+	if(entry) {
+		if (revshow || absshow || bibshow) {
+		entry.className = 'entry highlight show';
+		} else {
+		entry.className = 'entry show';
+		}
+	}
+	
+	// When there's a combination of abstract/review/bibtex showing, need to add class for correct styling
+	if(absshow) {
+		(revshow||bibshow)?abs.className = 'abstract nextshow':abs.className = 'abstract';
+	} 
+	if (revshow) {
+		bibshow?rev.className = 'review nextshow': rev.className = 'review';
+	}	
+	
+}
+
+function setStatistics (hits) {
+	if(hits < 0) { hits=numEntries; }
+	if(stats) { stats.firstChild.data = hits + '/' + numEntries}
+}
+
+function getTextContent(node) {
+	// Function written by Arve Bersvendsen
+	// http://www.virtuelvis.com
+	
+	if (node.nodeType == 3) {
+	return node.nodeValue;
+	} // text node
+	if (node.nodeType == 1 && node.className != "infolinks") { // element node
+	var text = [];
+	for (var chld = node.firstChild;chld;chld=chld.nextSibling) {
+		text.push(getTextContent(chld));
+	}
+	return text.join("");
+	} return ""; // some other node, won't contain text nodes.
+}
+
+function showAll(){
+	closeAllInfo();
+	for (var i = 0; i < numEntries; i++){ entryRows[i].className = 'entry show'; }
+}
+
+function closeAllInfo(){
+	for (var i=0; i < numInfo; i++){
+		if (infoRows[i].className.indexOf('noshow') ==-1) {
+			infoRows[i].className = infoRows[i].className + ' noshow';
+		}
+	}
+}
+
+function clearQS() {
+	qsfield.value = '';
+	showAll();
+}
+
+function redoQS(){
+	showAll();
+	quickSearch(qsfield);
+}
+
+function updateSetting(obj){
+	var option = obj.id;
+	var checked = obj.value;
+
+	switch(option)
+	 {
+	 case "opt_searchAbs":
+	   searchAbstract=!searchAbstract;
+	   redoQS();
+	   break;
+	 case "opt_searchRev":
+	   searchReview=!searchReview;
+	   redoQS();
+	   break;
+	 case "opt_useRegExp":
+	   searchRegExp=!searchRegExp;
+	   redoQS();
+	   break;
+	 case "opt_noAccents":
+	   noSquiggles=!noSquiggles;
+	   loadTableData();
+	   redoQS();
+	   break;
+	 }
+}
+
+function initPreferences(){
+	if(searchAbstract){document.getElementById("opt_searchAbs").checked = true;}
+	if(searchReview){document.getElementById("opt_searchRev").checked = true;}
+	if(noSquiggles){document.getElementById("opt_noAccents").checked = true;}
+	if(searchRegExp){document.getElementById("opt_useRegExp").checked = true;}
+	
+	if(numAbs==0) {document.getElementById("opt_searchAbs").parentNode.style.display = 'none';}
+	if(numRev==0) {document.getElementById("opt_searchRev").parentNode.style.display = 'none';}	
+}
+
+function toggleSettings(){
+	var togglebutton = document.getElementById('showsettings');
+	var settings = document.getElementById('settings');
+	
+	if(settings.className == "hidden"){
+		settings.className = "show";
+		togglebutton.innerText = "close settings";
+		togglebutton.textContent = "close settings";
+	}else{
+		settings.className = "hidden";
+		togglebutton.innerText = "settings...";		
+		togglebutton.textContent = "settings...";
+	}
+}
+
+-->
+</script>
+<style type="text/css">
+body { background-color: white; font-family: Arial, sans-serif; font-size: 13px; line-height: 1.2; padding: 1em; color: #2E2E2E; width: 50em; margin: auto auto; }
+
+form#quicksearch { width: auto; border-style: solid; border-color: gray; border-width: 1px 0px; padding: 0.7em 0.5em; display:none; position:relative; }
+span#searchstat {padding-left: 1em;}
+
+div#settings { margin-top:0.7em; /* border-bottom: 1px transparent solid; background-color: #efefef; border: 1px grey solid; */ }
+div#settings ul {margin: 0; padding: 0; }
+div#settings li {margin: 0; padding: 0 1em 0 0; display: inline; list-style: none; }
+div#settings li + li { border-left: 2px #efefef solid; padding-left: 0.5em;}
+div#settings input { margin-bottom: 0px;}
+
+div#settings.hidden {display:none;}
+
+#showsettings { border: 1px grey solid; padding: 0 0.5em; float:right; line-height: 1.6em; text-align: right; }
+#showsettings:hover { cursor: pointer; }
+
+.invalidsearch { background-color: red; }
+input[type="button"] { background-color: #efefef; border: 1px #2E2E2E solid;}
+
+table { border: 1px gray none; width: 100%; empty-cells: show; border-spacing: 0em 0.1em; margin: 1em 0em; }
+th, td { border: none; padding: 0.5em; vertical-align: top; text-align: justify; }
+
+td a { color: navy; text-decoration: none; }
+td a:hover  { text-decoration: underline; }
+
+tr.noshow { display: none;}
+tr.highlight td { background-color: #EFEFEF; border-top: 2px #2E2E2E solid; font-weight: bold; }
+tr.abstract td, tr.review td, tr.bibtex td { background-color: #EFEFEF; text-align: justify; border-bottom: 2px #2E2E2E solid; }
+tr.nextshow td { border-bottom-style: none; }
+
+tr.bibtex pre { width: 100%; overflow: auto; white-space: pre-wrap;}
+p.infolinks { margin: 0.3em 0em 0em 0em; padding: 0px; }
+
+@media print {
+	p.infolinks, #qs_settings, #quicksearch, t.bibtex { display: none !important; }
+	tr { page-break-inside: avoid; }
+}
+</style>
+</head>
+<body>
+
+<form action="" id="quicksearch">
+<input type="text" id="qs_field" autocomplete="off" placeholder="Type to search..." /> <input type="button" onclick="clearQS()" value="clear" />
+<span id="searchstat">Matching entries: <span id="stat">0</span></span>
+<div id="showsettings" onclick="toggleSettings()">settings...</div>
+<div id="settings" class="hidden">
+<ul>
+<li><input type="checkbox" class="search_setting" id="opt_searchAbs" onchange="updateSetting(this)"><label for="opt_searchAbs"> include abstract</label></li>
+<li><input type="checkbox" class="search_setting" id="opt_searchRev" onchange="updateSetting(this)"><label for="opt_searchRev"> include review</label></li>
+<li><input type="checkbox" class="search_setting" id="opt_useRegExp" onchange="updateSetting(this)"><label for="opt_useRegExp"> use RegExp</label></li>
+<li><input type="checkbox" class="search_setting" id="opt_noAccents" onchange="updateSetting(this)"><label for="opt_noAccents"> ignore accents</label></li>
+</ul>
+</div>
+</form>
+<table id="qs_table" border="1">
+<tbody>
+<tr id="An2007" class="entry">
+	<td>An S, Liu W and Venkatesh S (2007), <i>"Fast cross-validation algorithms for least squares support vector machine and kernel ridge regression"</i>, Pattern Recognition.  Vol. 40(8), pp. 2154-2162. Elsevier.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('An2007','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_An2007" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{An2007,
+  author = {An, Senjian and Liu, Wanquan and Venkatesh, Svetha},
+  title = {Fast cross-validation algorithms for least squares support vector machine and kernel ridge regression},
+  journal = {Pattern Recognition},
+  publisher = {Elsevier},
+  year = {2007},
+  volume = {40},
+  number = {8},
+  pages = {2154--2162}
+}
+</pre></td>
+</tr>
+<tr id="an2007acquiring" class="entry">
+	<td>An S, Liu W and Venkatesh S (2007), <i>"Acquiring critical light points for illumination subspaces of face images by affinity propagation clustering"</i>, In Advances in Multimedia Information Processing--PCM. , pp. 647-654. Springer.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('an2007acquiring','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_an2007acquiring" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@incollection{an2007acquiring,
+  author = {An, Senjian and Liu, Wanquan and Venkatesh, Svetha},
+  title = {Acquiring critical light points for illumination subspaces of face images by affinity propagation clustering},
+  booktitle = {Advances in Multimedia Information Processing--PCM},
+  publisher = {Springer},
+  year = {2007},
+  pages = {647--654}
+}
+</pre></td>
+</tr>
+<tr id="an2007face" class="entry">
+	<td>An S, Liu W and Venkatesh S (2007), <i>"Face recognition using kernel ridge regression"</i>, In IEEE Conference on Computer Vision and Pattern Recognition. , pp. 1-7.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('an2007face','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_an2007face" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{an2007face,
+  author = {An, Senjian and Liu, Wanquan and Venkatesh, Svetha},
+  title = {Face recognition using kernel ridge regression},
+  booktitle = {IEEE Conference on Computer Vision and Pattern Recognition},
+  year = {2007},
+  pages = {1--7}
+}
+</pre></td>
+</tr>
+<tr id="greenhill2007distributed" class="entry">
+	<td>Greenhill S and Venkatesh S (2007), <i>"Distributed query processing for mobile surveillance"</i>, In 15th international conference on Multimedia. , pp. 413-422.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('greenhill2007distributed','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_greenhill2007distributed" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{greenhill2007distributed,
+  author = {Greenhill, Stewart and Venkatesh, Svetha},
+  title = {Distributed query processing for mobile surveillance},
+  booktitle = {15th international conference on Multimedia},
+  year = {2007},
+  pages = {413--422}
+}
+</pre></td>
+</tr>
+<tr id="kuhnapfel2007calibration" class="entry">
+	<td>Kuhnapfel T, Tan T, Venkatesh S and Lehmann E (2007), <i>"Calibration of audio-video sensors for multi-modal event indexing"</i>, In IEEE International Conference on Acoustics, Speech and Signal Processing.  Vol. 2, pp. II-741.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('kuhnapfel2007calibration','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_kuhnapfel2007calibration" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{kuhnapfel2007calibration,
+  author = {Kuhnapfel, Thorsten and Tan, Tele and Venkatesh, Svetha and Lehmann, Eric},
+  title = {Calibration of audio-video sensors for multi-modal event indexing},
+  booktitle = {IEEE International Conference on Acoustics, Speech and Signal Processing},
+  year = {2007},
+  volume = {2},
+  pages = {II--741}
+}
+</pre></td>
+</tr>
+<tr id="luhr2007recognition" class="entry">
+	<td>L&uuml;hr S, West G and Venkatesh S (2007), <i>"Recognition of emergent human behaviour in a smart home: A data mining approach"</i>, Pervasive and Mobile Computing.  Vol. 3(2), pp. 95-116. Elsevier.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('luhr2007recognition','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_luhr2007recognition" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{luhr2007recognition,
+  author = {L&uuml;hr, Sebastian and West, Geoff and Venkatesh, Svetha},
+  title = {Recognition of emergent human behaviour in a smart home: A data mining approach},
+  journal = {Pervasive and Mobile Computing},
+  publisher = {Elsevier},
+  year = {2007},
+  volume = {3},
+  number = {2},
+  pages = {95--116}
+}
+</pre></td>
+</tr>
+<tr id="lu2007face" class="entry">
+	<td>Lu C, Liu W, An S and Venkatesh S (2007), <i>"Face recognition via incremental 2DPCA"</i>, In International Joint Conference on AI. IJCAI. , pp. 19-24.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('lu2007face','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_lu2007face" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{lu2007face,
+  author = {Lu, Chong and Liu, WQ and An, S and Venkatesh, Svetha},
+  title = {Face recognition via incremental 2DPCA},
+  booktitle = {International Joint Conference on AI. IJCAI},
+  year = {2007},
+  pages = {19--24}
+}
+</pre></td>
+</tr>
+<tr id="moncrieff2007film" class="entry">
+	<td>Moncrieff S and Venkatesh S (2007), <i>"Film audio pace"</i>, International journal of intelligent systems technologies and applications.  Vol. 3(3), pp. 296-308. Inderscience.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('moncrieff2007film','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_moncrieff2007film" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{moncrieff2007film,
+  author = {Moncrieff, Simon and Venkatesh, Svetha},
+  title = {Film audio pace},
+  journal = {International journal of intelligent systems technologies and applications},
+  publisher = {Inderscience},
+  year = {2007},
+  volume = {3},
+  number = {3},
+  pages = {296--308}
+}
+</pre></td>
+</tr>
+<tr id="moncrieff2007dynamic" class="entry">
+	<td>Moncrieff S, Venkatesh S and West G (2007), <i>"Dynamic privacy in a smart house environment"</i>, In IEEE International Conference on Multimedia and Expo. , pp. 2034-2037.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('moncrieff2007dynamic','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_moncrieff2007dynamic" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{moncrieff2007dynamic,
+  author = {Moncrieff, Simon and Venkatesh, Svetha and West, Geoff},
+  title = {Dynamic privacy in a smart house environment},
+  booktitle = {IEEE International Conference on Multimedia and Expo},
+  year = {2007},
+  pages = {2034--2037}
+}
+</pre></td>
+</tr>
+<tr id="moncrieff2007online" class="entry">
+	<td>Moncrieff S, Venkatesh S and West G (2007), <i>"Online audio background determination for complex audio environments"</i>, ACM Transactions on Multimedia Computing, Communications, and Applications (TOMCCAP).  Vol. 3(2), pp. 8. ACM.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('moncrieff2007online','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_moncrieff2007online" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{moncrieff2007online,
+  author = {Moncrieff, Simon and Venkatesh, Svetha and West, Geoff},
+  title = {Online audio background determination for complex audio environments},
+  journal = {ACM Transactions on Multimedia Computing, Communications, and Applications (TOMCCAP)},
+  publisher = {ACM},
+  year = {2007},
+  volume = {3},
+  number = {2},
+  pages = {8}
+}
+</pre></td>
+</tr>
+<tr id="moncrieff2007privacy" class="entry">
+	<td>Moncrieff S, Venkatesh S and West G (2007), <i>"Privacy and the access of information in a smart house environment"</i>, In 15th International Conference on Multimedia. , pp. 671-680.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('moncrieff2007privacy','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_moncrieff2007privacy" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{moncrieff2007privacy,
+  author = {Moncrieff, Simon and Venkatesh, Svetha and West, Geoff},
+  title = {Privacy and the access of information in a smart house environment},
+  booktitle = {15th International Conference on Multimedia},
+  year = {2007},
+  pages = {671--680}
+}
+</pre></td>
+</tr>
+<tr id="moncrieff2007multi" class="entry">
+	<td>Moncrieff S, Venkatesh S, West G and Greenhill S (2007), <i>"Multi-modal emotive computing in a smart house environment"</i>, Pervasive and Mobile Computing.  Vol. 3(2), pp. 74-94. Elsevier.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('moncrieff2007multi','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_moncrieff2007multi" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{moncrieff2007multi,
+  author = {Moncrieff, Simon and Venkatesh, Svetha and West, Geoff and Greenhill, Stewart},
+  title = {Multi-modal emotive computing in a smart house environment},
+  journal = {Pervasive and Mobile Computing},
+  publisher = {Elsevier},
+  year = {2007},
+  volume = {3},
+  number = {2},
+  pages = {74--94}
+}
+</pre></td>
+</tr>
+<tr id="nguyen2007random" class="entry">
+	<td>Nguyen N, Liu W and Venkatesh S (2007), <i>"Random subspace two-dimensional PCA for face recognition"</i>, In Advances in Multimedia Information Processing. , pp. 655-664. Springer.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('nguyen2007random','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_nguyen2007random" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@incollection{nguyen2007random,
+  author = {Nguyen, Nam and Liu, Wanquan and Venkatesh, Svetha},
+  title = {Random subspace two-dimensional PCA for face recognition},
+  booktitle = {Advances in Multimedia Information Processing},
+  publisher = {Springer},
+  year = {2007},
+  pages = {655--664}
+}
+</pre></td>
+</tr>
+<tr id="peursum2007tracking" class="entry">
+	<td>Peursum P, Venkatesh S and West G (2007), <i>"Tracking-as-recognition for articulated full-body human motion analysis"</i>, In IEEE Conference on Computer Vision and Pattern Recognition. , pp. 1-8.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('peursum2007tracking','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_peursum2007tracking" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{peursum2007tracking,
+  author = {Peursum, Patrick and Venkatesh, Svetha and West, Geoff},
+  title = {Tracking-as-recognition for articulated full-body human motion analysis},
+  booktitle = {IEEE Conference on Computer Vision and Pattern Recognition},
+  year = {2007},
+  pages = {1--8}
+}
+</pre></td>
+</tr>
+<tr id="riedel2007threshold" class="entry">
+	<td>Riedel DE, Venkatesh S and Liu W (2007), <i>"Threshold dynamic time warping for spatial activity recognition"</i>, International journal of information and systems sciences.  Vol. 3(3), pp. 392-405. Institute for Scientific Computing and Information.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('riedel2007threshold','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_riedel2007threshold" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{riedel2007threshold,
+  author = {Riedel, Daniel Erwin and Venkatesh, Svetha and Liu, Wanquan},
+  title = {Threshold dynamic time warping for spatial activity recognition},
+  journal = {International journal of information and systems sciences},
+  publisher = {Institute for Scientific Computing and Information},
+  year = {2007},
+  volume = {3},
+  number = {3},
+  pages = {392--405}
+}
+</pre></td>
+</tr>
+<tr id="Saha2007" class="entry">
+	<td>Saha B, Lazarescu M and Venkatesh S (2007), <i>"Infrequent item mining in multiple data streams"</i>, In Seventh IEEE International Conference on Data Mining Workshops. , pp. 569-574.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('Saha2007','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_Saha2007" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{Saha2007,
+  author = {Saha, Budhaditya and Lazarescu, Mihai and Venkatesh, Svetha},
+  title = {Infrequent item mining in multiple data streams},
+  booktitle = {Seventh IEEE International Conference on Data Mining Workshops},
+  year = {2007},
+  pages = {569--574}
+}
+</pre></td>
+</tr>
+<tr id="Tjahyadi2007" class="entry">
+	<td>Tjahyadi R, Liu W, An S and Venkatesh S (2007), <i>"Face recognition based on ordinal correlation"</i>, International Journal of Intelligent Systems Technologies and Applications.  Vol. 3(3), pp. 226-240. Inderscience.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('Tjahyadi2007','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_Tjahyadi2007" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{Tjahyadi2007,
+  author = {Tjahyadi, Ronny and Liu, Wanquan and An, Senjian and Venkatesh, Svetha},
+  title = {Face recognition based on ordinal correlation},
+  journal = {International Journal of Intelligent Systems Technologies and Applications},
+  publisher = {Inderscience},
+  year = {2007},
+  volume = {3},
+  number = {3},
+  pages = {226--240}
+}
+</pre></td>
+</tr>
+<tr id="tjahyadi2007face" class="entry">
+	<td>Tjahyadi R, Liu W, An S and Venkatesh S (2007), <i>"Face Recognition via the Overlapping Energy Histogram."</i>, In IJCAI: 20th International Joint Conference on Artifical intelligence. , pp. 2891-2896.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('tjahyadi2007face','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_tjahyadi2007face" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{tjahyadi2007face,
+  author = {Tjahyadi, Ronny and Liu, Wanquan and An, Senjian and Venkatesh, Svetha},
+  title = {Face Recognition via the Overlapping Energy Histogram.},
+  booktitle = {IJCAI: 20th International Joint Conference on Artifical intelligence},
+  year = {2007},
+  pages = {2891--2896}
+}
+</pre></td>
+</tr>
+<tr id="phung2007preference" class="entry">
+	<td>Tran TT, Phung DQ and Venkatesh S (2007), <i>"Preference networks: Probabilistic models for recommendation systems"</i>, In Sixth Australasian conference on Data mining and analytics. , pp. 195-202.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('phung2007preference','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_phung2007preference" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{phung2007preference,
+  author = {Tran,Truyen The and Phung, Dinh Q and Venkatesh, Svetha},
+  title = {Preference networks: Probabilistic models for recommendation systems},
+  booktitle = {Sixth Australasian conference on Data mining and analytics},
+  year = {2007},
+  pages = {195--202}
+}
+</pre></td>
+</tr>
+<tr id="truong2007generating" class="entry">
+	<td>Truong BT and Venkatesh S (2007), <i>"Generating comprehensible summaries of rushes sequences based on robust feature matching"</i>, In International Workshop on TRECVID video summarization. , pp. 30-34.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('truong2007generating','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_truong2007generating" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{truong2007generating,
+  author = {Truong, Ba Tu and Venkatesh, Svetha},
+  title = {Generating comprehensible summaries of rushes sequences based on robust feature matching},
+  booktitle = {International Workshop on TRECVID video summarization},
+  year = {2007},
+  pages = {30--34}
+}
+</pre></td>
+</tr>
+<tr id="truong2007video" class="entry">
+	<td>Truong BT and Venkatesh S (2007), <i>"Video abstraction: A systematic review and classification"</i>, ACM Transactions on Multimedia Computing, Communications, and Applications (TOMCCAP).  Vol. 3(1), pp. 1-37. ACM.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('truong2007video','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_truong2007video" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{truong2007video,
+  author = {Truong, Ba Tu and Venkatesh, Svetha},
+  title = {Video abstraction: A systematic review and classification},
+  journal = {ACM Transactions on Multimedia Computing, Communications, and Applications (TOMCCAP)},
+  publisher = {ACM},
+  year = {2007},
+  volume = {3},
+  number = {1},
+  pages = {1-37}
+}
+</pre></td>
+</tr>
+</tbody>
+</table>
+<footer>
+ <small>Created by <a href="http://jabref.sourceforge.net">JabRef</a> on 04/12/2017.</small>
+</footer>
+<!-- file generated by JabRef -->
+</body>
+</html>

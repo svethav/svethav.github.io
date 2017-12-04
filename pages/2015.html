@@ -1,0 +1,1188 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<title>JabRef references</title>
+<meta http-equiv="Content-Type" content="text/html; charset=windows-1252">
+<script type="text/javascript">
+<!--
+// QuickSearch script for JabRef HTML export 
+// Version: 3.0
+//
+// Copyright (c) 2006-2011, Mark Schenk
+//
+// This software is distributed under a Creative Commons Attribution 3.0 License
+// http://creativecommons.org/licenses/by/3.0/
+//
+// Features:
+// - intuitive find-as-you-type searching
+//    ~ case insensitive
+//    ~ ignore diacritics (optional)
+//
+// - search with/without Regular Expressions
+// - match BibTeX key
+//
+
+// Search settings
+var searchAbstract = true;	// search in abstract
+var searchReview = true;	// search in review
+
+var noSquiggles = true; 	// ignore diacritics when searching
+var searchRegExp = false; 	// enable RegExp searches
+
+
+if (window.addEventListener) {
+	window.addEventListener("load",initSearch,false); }
+else if (window.attachEvent) {
+	window.attachEvent("onload", initSearch); }
+
+function initSearch() {
+	// check for quick search table and searchfield
+	if (!document.getElementById('qs_table')||!document.getElementById('quicksearch')) { return; }
+
+	// load all the rows and sort into arrays
+	loadTableData();
+	
+	//find the query field
+	qsfield = document.getElementById('qs_field');
+
+	// previous search term; used for speed optimisation
+	prevSearch = '';
+
+	//find statistics location
+	stats = document.getElementById('stat');
+	setStatistics(-1);
+	
+	// set up preferences
+	initPreferences();
+
+	// shows the searchfield
+	document.getElementById('quicksearch').style.display = 'block';
+	document.getElementById('qs_field').onkeyup = quickSearch;
+}
+
+function loadTableData() {
+	// find table and appropriate rows
+	searchTable = document.getElementById('qs_table');
+	var allRows = searchTable.getElementsByTagName('tbody')[0].getElementsByTagName('tr');
+
+	// split all rows into entryRows and infoRows (e.g. abstract, review, bibtex)
+	entryRows = new Array(); infoRows = new Array(); absRows = new Array(); revRows = new Array();
+
+	// get data from each row
+	entryRowsData = new Array(); absRowsData = new Array(); revRowsData = new Array(); 
+	
+	BibTeXKeys = new Array();
+	
+	for (var i=0, k=0, j=0; i<allRows.length;i++) {
+		if (allRows[i].className.match(/entry/)) {
+			entryRows[j] = allRows[i];
+			entryRowsData[j] = stripDiacritics(getTextContent(allRows[i]));
+			allRows[i].id ? BibTeXKeys[j] = allRows[i].id : allRows[i].id = 'autokey_'+j;
+			j ++;
+		} else {
+			infoRows[k++] = allRows[i];
+			// check for abstract/review
+			if (allRows[i].className.match(/abstract/)) {
+				absRows.push(allRows[i]);
+				absRowsData[j-1] = stripDiacritics(getTextContent(allRows[i]));
+			} else if (allRows[i].className.match(/review/)) {
+				revRows.push(allRows[i]);
+				revRowsData[j-1] = stripDiacritics(getTextContent(allRows[i]));
+			}
+		}
+	}
+	//number of entries and rows
+	numEntries = entryRows.length;
+	numInfo = infoRows.length;
+	numAbs = absRows.length;
+	numRev = revRows.length;
+}
+
+function quickSearch(){
+	
+	tInput = qsfield;
+
+	if (tInput.value.length == 0) {
+		showAll();
+		setStatistics(-1);
+		qsfield.className = '';
+		return;
+	} else {
+		t = stripDiacritics(tInput.value);
+
+		if(!searchRegExp) { t = escapeRegExp(t); }
+			
+		// only search for valid RegExp
+		try {
+			textRegExp = new RegExp(t,"i");
+			closeAllInfo();
+			qsfield.className = '';
+		}
+			catch(err) {
+			prevSearch = tInput.value;
+			qsfield.className = 'invalidsearch';
+			return;
+		}
+	}
+	
+	// count number of hits
+	var hits = 0;
+
+	// start looping through all entry rows
+	for (var i = 0; cRow = entryRows[i]; i++){
+
+		// only show search the cells if it isn't already hidden OR if the search term is getting shorter, then search all
+		if(cRow.className.indexOf('noshow')==-1 || tInput.value.length <= prevSearch.length){
+			var found = false; 
+
+			if (entryRowsData[i].search(textRegExp) != -1 || BibTeXKeys[i].search(textRegExp) != -1){ 
+				found = true;
+			} else {
+				if(searchAbstract && absRowsData[i]!=undefined) {
+					if (absRowsData[i].search(textRegExp) != -1){ found=true; } 
+				}
+				if(searchReview && revRowsData[i]!=undefined) {
+					if (revRowsData[i].search(textRegExp) != -1){ found=true; } 
+				}
+			}
+			
+			if (found){
+				cRow.className = 'entry show';
+				hits++;
+			} else {
+				cRow.className = 'entry noshow';
+			}
+		}
+	}
+
+	// update statistics
+	setStatistics(hits)
+	
+	// set previous search value
+	prevSearch = tInput.value;
+}
+
+
+// Strip Diacritics from text
+// http://stackoverflow.com/questions/990904/javascript-remove-accents-in-strings
+
+// String containing replacement characters for stripping accents 
+var stripstring = 
+    'AAAAAAACEEEEIIII'+
+    'DNOOOOO.OUUUUY..'+
+    'aaaaaaaceeeeiiii'+
+    'dnooooo.ouuuuy.y'+
+    'AaAaAaCcCcCcCcDd'+
+    'DdEeEeEeEeEeGgGg'+
+    'GgGgHhHhIiIiIiIi'+
+    'IiIiJjKkkLlLlLlL'+
+    'lJlNnNnNnnNnOoOo'+
+    'OoOoRrRrRrSsSsSs'+
+    'SsTtTtTtUuUuUuUu'+
+    'UuUuWwYyYZzZzZz.';
+
+function stripDiacritics(str){
+
+    if(noSquiggles==false){
+        return str;
+    }
+
+    var answer='';
+    for(var i=0;i<str.length;i++){
+        var ch=str[i];
+        var chindex=ch.charCodeAt(0)-192;   // Index of character code in the strip string
+        if(chindex>=0 && chindex<stripstring.length){
+            // Character is within our table, so we can strip the accent...
+            var outch=stripstring.charAt(chindex);
+            // ...unless it was shown as a '.'
+            if(outch!='.')ch=outch;
+        }
+        answer+=ch;
+    }
+    return answer;
+}
+
+// http://stackoverflow.com/questions/3446170/escape-string-for-use-in-javascript-regex
+// NOTE: must escape every \ in the export code because of the JabRef Export...
+function escapeRegExp(str) {
+  return str.replace(/[-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, "\\$&");
+}
+
+function toggleInfo(articleid,info) {
+
+	var entry = document.getElementById(articleid);
+	var abs = document.getElementById('abs_'+articleid);
+	var rev = document.getElementById('rev_'+articleid);
+	var bib = document.getElementById('bib_'+articleid);
+	
+	if (abs && info == 'abstract') {
+		abs.className.indexOf('noshow') == -1?abs.className = 'abstract noshow':abs.className = 'abstract show';
+	} else if (rev && info == 'review') {
+		rev.className.indexOf('noshow') == -1?rev.className = 'review noshow':rev.className = 'review show';
+	} else if (bib && info == 'bibtex') {
+		bib.className.indexOf('noshow') == -1?bib.className = 'bibtex noshow':bib.className = 'bibtex show';
+	} else { 
+		return;
+	}
+
+	// check if one or the other is available
+	var revshow; var absshow; var bibshow;
+	(abs && abs.className.indexOf('noshow') == -1)? absshow = true: absshow = false;
+	(rev && rev.className.indexOf('noshow') == -1)? revshow = true: revshow = false;	
+	(bib && bib.className.indexOf('noshow') == -1)? bibshow = true: bibshow = false;
+	
+	// highlight original entry
+	if(entry) {
+		if (revshow || absshow || bibshow) {
+		entry.className = 'entry highlight show';
+		} else {
+		entry.className = 'entry show';
+		}
+	}
+	
+	// When there's a combination of abstract/review/bibtex showing, need to add class for correct styling
+	if(absshow) {
+		(revshow||bibshow)?abs.className = 'abstract nextshow':abs.className = 'abstract';
+	} 
+	if (revshow) {
+		bibshow?rev.className = 'review nextshow': rev.className = 'review';
+	}	
+	
+}
+
+function setStatistics (hits) {
+	if(hits < 0) { hits=numEntries; }
+	if(stats) { stats.firstChild.data = hits + '/' + numEntries}
+}
+
+function getTextContent(node) {
+	// Function written by Arve Bersvendsen
+	// http://www.virtuelvis.com
+	
+	if (node.nodeType == 3) {
+	return node.nodeValue;
+	} // text node
+	if (node.nodeType == 1 && node.className != "infolinks") { // element node
+	var text = [];
+	for (var chld = node.firstChild;chld;chld=chld.nextSibling) {
+		text.push(getTextContent(chld));
+	}
+	return text.join("");
+	} return ""; // some other node, won't contain text nodes.
+}
+
+function showAll(){
+	closeAllInfo();
+	for (var i = 0; i < numEntries; i++){ entryRows[i].className = 'entry show'; }
+}
+
+function closeAllInfo(){
+	for (var i=0; i < numInfo; i++){
+		if (infoRows[i].className.indexOf('noshow') ==-1) {
+			infoRows[i].className = infoRows[i].className + ' noshow';
+		}
+	}
+}
+
+function clearQS() {
+	qsfield.value = '';
+	showAll();
+}
+
+function redoQS(){
+	showAll();
+	quickSearch(qsfield);
+}
+
+function updateSetting(obj){
+	var option = obj.id;
+	var checked = obj.value;
+
+	switch(option)
+	 {
+	 case "opt_searchAbs":
+	   searchAbstract=!searchAbstract;
+	   redoQS();
+	   break;
+	 case "opt_searchRev":
+	   searchReview=!searchReview;
+	   redoQS();
+	   break;
+	 case "opt_useRegExp":
+	   searchRegExp=!searchRegExp;
+	   redoQS();
+	   break;
+	 case "opt_noAccents":
+	   noSquiggles=!noSquiggles;
+	   loadTableData();
+	   redoQS();
+	   break;
+	 }
+}
+
+function initPreferences(){
+	if(searchAbstract){document.getElementById("opt_searchAbs").checked = true;}
+	if(searchReview){document.getElementById("opt_searchRev").checked = true;}
+	if(noSquiggles){document.getElementById("opt_noAccents").checked = true;}
+	if(searchRegExp){document.getElementById("opt_useRegExp").checked = true;}
+	
+	if(numAbs==0) {document.getElementById("opt_searchAbs").parentNode.style.display = 'none';}
+	if(numRev==0) {document.getElementById("opt_searchRev").parentNode.style.display = 'none';}	
+}
+
+function toggleSettings(){
+	var togglebutton = document.getElementById('showsettings');
+	var settings = document.getElementById('settings');
+	
+	if(settings.className == "hidden"){
+		settings.className = "show";
+		togglebutton.innerText = "close settings";
+		togglebutton.textContent = "close settings";
+	}else{
+		settings.className = "hidden";
+		togglebutton.innerText = "settings...";		
+		togglebutton.textContent = "settings...";
+	}
+}
+
+-->
+</script>
+<style type="text/css">
+body { background-color: white; font-family: Arial, sans-serif; font-size: 13px; line-height: 1.2; padding: 1em; color: #2E2E2E; width: 50em; margin: auto auto; }
+
+form#quicksearch { width: auto; border-style: solid; border-color: gray; border-width: 1px 0px; padding: 0.7em 0.5em; display:none; position:relative; }
+span#searchstat {padding-left: 1em;}
+
+div#settings { margin-top:0.7em; /* border-bottom: 1px transparent solid; background-color: #efefef; border: 1px grey solid; */ }
+div#settings ul {margin: 0; padding: 0; }
+div#settings li {margin: 0; padding: 0 1em 0 0; display: inline; list-style: none; }
+div#settings li + li { border-left: 2px #efefef solid; padding-left: 0.5em;}
+div#settings input { margin-bottom: 0px;}
+
+div#settings.hidden {display:none;}
+
+#showsettings { border: 1px grey solid; padding: 0 0.5em; float:right; line-height: 1.6em; text-align: right; }
+#showsettings:hover { cursor: pointer; }
+
+.invalidsearch { background-color: red; }
+input[type="button"] { background-color: #efefef; border: 1px #2E2E2E solid;}
+
+table { border: 1px gray none; width: 100%; empty-cells: show; border-spacing: 0em 0.1em; margin: 1em 0em; }
+th, td { border: none; padding: 0.5em; vertical-align: top; text-align: justify; }
+
+td a { color: navy; text-decoration: none; }
+td a:hover  { text-decoration: underline; }
+
+tr.noshow { display: none;}
+tr.highlight td { background-color: #EFEFEF; border-top: 2px #2E2E2E solid; font-weight: bold; }
+tr.abstract td, tr.review td, tr.bibtex td { background-color: #EFEFEF; text-align: justify; border-bottom: 2px #2E2E2E solid; }
+tr.nextshow td { border-bottom-style: none; }
+
+tr.bibtex pre { width: 100%; overflow: auto; white-space: pre-wrap;}
+p.infolinks { margin: 0.3em 0em 0em 0em; padding: 0px; }
+
+@media print {
+	p.infolinks, #qs_settings, #quicksearch, t.bibtex { display: none !important; }
+	tr { page-break-inside: avoid; }
+}
+</style>
+</head>
+<body>
+
+<form action="" id="quicksearch">
+<input type="text" id="qs_field" autocomplete="off" placeholder="Type to search..." /> <input type="button" onclick="clearQS()" value="clear" />
+<span id="searchstat">Matching entries: <span id="stat">0</span></span>
+<div id="showsettings" onclick="toggleSettings()">settings...</div>
+<div id="settings" class="hidden">
+<ul>
+<li><input type="checkbox" class="search_setting" id="opt_searchAbs" onchange="updateSetting(this)"><label for="opt_searchAbs"> include abstract</label></li>
+<li><input type="checkbox" class="search_setting" id="opt_searchRev" onchange="updateSetting(this)"><label for="opt_searchRev"> include review</label></li>
+<li><input type="checkbox" class="search_setting" id="opt_useRegExp" onchange="updateSetting(this)"><label for="opt_useRegExp"> use RegExp</label></li>
+<li><input type="checkbox" class="search_setting" id="opt_noAccents" onchange="updateSetting(this)"><label for="opt_noAccents"> ignore accents</label></li>
+</ul>
+</div>
+</form>
+<table id="qs_table" border="1">
+<tbody>
+<tr id="AranPhamVenk2014a" class="entry">
+	<td>Arandjelovi&#263; O, Pham D and Venkatesh S (2015), <i>"Two maximum entropy based algorithms for running quantile estimation in non-stationary data streams"</i>, IEEE Transactions on Circuits and Systems for Video Technology (TCSVT)., Sept, 2015.  Vol. 25(9), pp. 1469-1479.
+	<p class="infolinks">[<a href="javascript:toggleInfo('AranPhamVenk2014a','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('AranPhamVenk2014a','bibtex')">BibTeX</a>] [<a href="http://dx.doi.org/10.1109/TCSVT.2014.2376137" target="_blank">DOI</a>] [<a href="http://arxiv.org/pdf/1411.2250v1.pdf" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_AranPhamVenk2014a" class="abstract noshow">
+	<td><b>Abstract</b>: The need to estimate a particular quantile of a distribution is an important problem which frequently arises in many computer vision and signal processing applications. For example, our work was motivated by the requirements of many semi-automatic surveillance analytics systems which detect abnormalities in close-circuit television (CCTV) footage using statistical models of low-level motion features. In this paper we specifically address the problem of estimating the running quantile of a data stream when the memory for storing observations is limited. We make several major contributions: (i) we highlight the limitations of approaches previously described in the literature which make them unsuitable for non-stationary streams, (ii) we describe a novel principle for the utilization of the available storage space, (iii) we introduce two novel algorithms which exploit the proposed principle in different ways, and (iv) we present a comprehensive evaluation and analysis of the proposed algorithms and the existing methods in the literature on both synthetic data sets and three large real-world streams acquired in the course of operation of an existing commercial surveillance system. Our findings convincingly demonstrate that both of the proposed methods are highly successful and vastly outperform the existing alternatives. We show that the better of the two algorithms (data-aligned histogram) exhibits far superior performance in comparison with the previously described methods, achieving more than 10 times lower estimate errors on real-world data, even when its available working memory is an order of magnitude smaller.</td>
+</tr>
+<tr id="bib_AranPhamVenk2014a" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{AranPhamVenk2014a,
+  author = {Arandjelovi&#263;, O. and Pham, D. and Venkatesh, Svetha.},
+  title = {Two maximum entropy based algorithms for running quantile estimation in non-stationary data streams},
+  journal = {IEEE Transactions on Circuits and Systems for Video Technology (TCSVT)},
+  year = {2015},
+  volume = {25},
+  number = {9},
+  pages = {1469-1479},
+  url = {http://arxiv.org/pdf/1411.2250v1.pdf},
+  doi = {10.1109/TCSVT.2014.2376137}
+}
+</pre></td>
+</tr>
+<tr id="arandjelovic2015adaptable" class="entry">
+	<td>Arandjelovi&#263; O, Pham D-S and Venkatesh S (2015), <i>"The adaptable buffer algorithm for high quantile estimation in non-stationary data streams"</i>, In 2015 International Joint Conference on Neural Networks (IJCNN). , pp. 1-7.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('arandjelovic2015adaptable','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_arandjelovic2015adaptable" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{arandjelovic2015adaptable,
+  author = {Arandjelovi&#263;, Ognjen and Pham, Duc-Son and Venkatesh, Svetha},
+  title = {The adaptable buffer algorithm for high quantile estimation in non-stationary data streams},
+  booktitle = {2015 International Joint Conference on Neural Networks (IJCNN)},
+  year = {2015},
+  pages = {1--7}
+}
+</pre></td>
+</tr>
+<tr id="arandjelovic2015efficient" class="entry">
+	<td>Arandjelovi&#263; O, Pham D-S and Venkatesh S (2015), <i>"Efficient and accurate set-based registration of time-separated aerial images"</i>, Pattern Recognition.  Vol. 48(11), pp. 3466-3476. Elsevier.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('arandjelovic2015efficient','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_arandjelovic2015efficient" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{arandjelovic2015efficient,
+  author = {Arandjelovi&#263;, Ognjen and Pham, Duc-Son and Venkatesh, Svetha},
+  title = {Efficient and accurate set-based registration of time-separated aerial images},
+  journal = {Pattern Recognition},
+  publisher = {Elsevier},
+  year = {2015},
+  volume = {48},
+  number = {11},
+  pages = {3466--3476}
+}
+</pre></td>
+</tr>
+<tr id="arandjelovic2015groupwise" class="entry">
+	<td>Arandjelovic O, Pham D-S and Venkatesh S (2015), <i>"Groupwise Registration of Aerial Images"</i>, In Twenty-Fourth International Joint Conference on Artificial Intelligence., July, 2015. 
+	<p class="infolinks"> [<a href="javascript:toggleInfo('arandjelovic2015groupwise','bibtex')">BibTeX</a>] [<a href="https://arxiv.org/pdf/1504.05299v1.pdf" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="bib_arandjelovic2015groupwise" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{arandjelovic2015groupwise,
+  author = {Arandjelovic, Ognjen and Pham, Duc-Son and Venkatesh, Svetha},
+  title = {Groupwise Registration of Aerial Images},
+  booktitle = {Twenty-Fourth International Joint Conference on Artificial Intelligence},
+  year = {2015},
+  url = {https://arxiv.org/pdf/1504.05299v1.pdf}
+}
+</pre></td>
+</tr>
+<tr id="arandjelovic2015viewpoint" class="entry">
+	<td>Arandjelovic O, Pham D-S and Venkatesh S (2015), <i>"Viewpoint distortion compensation in practical surveillance systems"</i>, In International Conference on Multimedia &amp; Expo (ICME). 
+	<p class="infolinks"> [<a href="javascript:toggleInfo('arandjelovic2015viewpoint','bibtex')">BibTeX</a>] [<a href="https://arxiv.org/pdf/1504.05298v1.pdf" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="bib_arandjelovic2015viewpoint" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{arandjelovic2015viewpoint,
+  author = {Arandjelovic, Ognjen and Pham, Duc-Son and Venkatesh, Svetha},
+  title = {Viewpoint distortion compensation in practical surveillance systems},
+  booktitle = {International Conference on Multimedia &amp; Expo (ICME)},
+  year = {2015},
+  url = {https://arxiv.org/pdf/1504.05298v1.pdf}
+}
+</pre></td>
+</tr>
+<tr id="Beykikhoshk2015usingtwitter" class="entry">
+	<td>Beykikhoshk A, Arandjelovi&#263; O, Phung D, Venkatesh S and Caelli T (2015), <i>"Using Twitter to learn about the autism community"</i>, Social Network Analysis and Mining.  Vol. 5(1), pp. 1-17.
+	<p class="infolinks">[<a href="javascript:toggleInfo('Beykikhoshk2015usingtwitter','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('Beykikhoshk2015usingtwitter','bibtex')">BibTeX</a>] [<a href="http://dx.doi.org/10.1007/s13278-015-0261-5" target="_blank">DOI</a>] [<a href="http://dx.doi.org/10.1007/s13278-015-0261-5" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_Beykikhoshk2015usingtwitter" class="abstract noshow">
+	<td><b>Abstract</b>: Considering the raising socio-economic burden of autism spectrum disorder (ASD), timely and evidence-driven public policy decision-making and communication of the latest guidelines pertaining to the treatment and management of the disorder is crucial. Yet evidence suggests that policy makers and medical practitioners do not always have a good understanding of the practices and relevant beliefs of ASD-afflicted individuals' carers who often follow questionable recommendations and adopt advice poorly supported by scientific data. The key goal of the present work is to explore the idea that Twitter, as a highly popular platform for information exchange, could be used as a data-mining source to learn about the population affected by ASD---their behaviour, concerns, needs, etc. To this end, using a large data set of over 11 million harvested tweets as the basis for our investigation, we describe a series of experiments which examine a range of linguistic and semantic aspects of messages posted by individuals interested in ASD. Our findings, the first of their nature in the published scientific literature, strongly motivate additional research on this topic and present a methodological basis for further work.</td>
+</tr>
+<tr id="bib_Beykikhoshk2015usingtwitter" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{Beykikhoshk2015usingtwitter,
+  author = {Beykikhoshk, Adham and Arandjelovi&#263;, Ognjen and Phung, Dinh and Venkatesh, Svetha and Caelli, Terry},
+  title = {Using Twitter to learn about the autism community},
+  journal = {Social Network Analysis and Mining},
+  year = {2015},
+  volume = {5},
+  number = {1},
+  pages = {1--17},
+  url = {http://dx.doi.org/10.1007/s13278-015-0261-5},
+  doi = {10.1007/s13278-015-0261-5}
+}
+</pre></td>
+</tr>
+<tr id="dao_nguyen_phung_venkatesh_dsaa15" class="entry">
+	<td>Dao B, Nguyen T, Venkatesh S and Phung D (2015), <i>"Nonparametric Discovery of Online Mental Health-Related Communities"</i>, In International Conference on Data Science and Advanced Analytics (DSAA2015). Paris, France , pp. 1-10.
+	<p class="infolinks">[<a href="javascript:toggleInfo('dao_nguyen_phung_venkatesh_dsaa15','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('dao_nguyen_phung_venkatesh_dsaa15','bibtex')">BibTeX</a>] [<a href="http://ieeexplore.ieee.org/xpls/abs_all.jsp?arnumber=7344841" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_dao_nguyen_phung_venkatesh_dsaa15" class="abstract noshow">
+	<td><b>Abstract</b>: People are increasingly using social media, especially online communities, to discuss mental health issues and seek supports. Understanding topics, interaction, sentiment and clustering structures of these communities informs important aspects of mental health. It can potentially add knowledge to the underlying cognitive dynamics, mood swings patterns, shared interests, and interaction. There has been growing research interest in analyzing online mental health communities; however sentiment analysis of these communities has been largely under-explored. This study presents an analysis of online Live Journal communities with and without mental health-related conditions including depression and autism. Latent topics for mood tags, affective words, and generic words in the content of the posts made in these communities were learned using nonparametric topic modelling. These representations were then input into a nonparametric clustering to discover meta-groups among the communities. The best performance results can be achieved on clustering communities with latent mood-based representation for such communities. The study also found significant differences in usage latent topics for mood tags and affective features between online communities with and without affective disorders. The findings reveal useful insights into hyper-group detection of online mental health-related communities.</td>
+</tr>
+<tr id="bib_dao_nguyen_phung_venkatesh_dsaa15" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{dao_nguyen_phung_venkatesh_dsaa15,
+  author = {Dao, Bo and Nguyen, Thin and Venkatesh, Svetha and Phung, Dinh},
+  title = {Nonparametric Discovery of Online Mental Health-Related Communities},
+  booktitle = {International Conference on Data Science and Advanced Analytics (DSAA2015)},
+  year = {2015},
+  pages = {1--10},
+  url = {http://ieeexplore.ieee.org/xpls/abs_all.jsp?arnumber=7344841}
+}
+</pre></td>
+</tr>
+<tr id="gopakumar_et_al_pakdd15" class="entry">
+	<td>Gopakumar S, Nguyen TD, Tran T, Phung D and Venkatesh S (2015), <i>"Stabilizing Sparse Cox Model Using Statistic and Semantic Structures in Electronic Medical Records"</i>, In Advances in Knowledge Discovery and Data Mining.  Vol. 9078, pp. 331-343. Springer International Publishing.
+	<p class="infolinks">[<a href="javascript:toggleInfo('gopakumar_et_al_pakdd15','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('gopakumar_et_al_pakdd15','bibtex')">BibTeX</a>] [<a href="http://dx.doi.org/10.1007/978-3-319-18032-8_26" target="_blank">DOI</a>] [<a href="http://prada-research.net/~truyen/papers/pakdd_main.pdf" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_gopakumar_et_al_pakdd15" class="abstract noshow">
+	<td><b>Abstract</b>: Stability in clinical prediction models is crucial for transferability between studies, yet has received little attention. The problem is paramount in high dimensional data, which invites sparse models with feature selection capability. We introduce an effective method to stabilize sparse Cox model of time-to-events using statistical and semantic structures inherent in Electronic Medical Records (EMR). Model estimation is stabilized using three feature graphs built from (i) Jaccard similarity among features (ii) aggregation of Jaccard similarity graph and a recently introduced semantic EMR graph (iii) Jaccard similarity among features transferred from a related cohort. Our experiments are conducted on two real world hospital datasets: a heart failure cohort and a diabetes cohort. On two stability measures – the Consistency index and signal-to-noise ratio (SNR) – the use of our proposed methods significantly increased feature stability when compared with the baselines.</td>
+</tr>
+<tr id="bib_gopakumar_et_al_pakdd15" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@incollection{gopakumar_et_al_pakdd15,
+  author = {Gopakumar, Shivapratap and Nguyen, Tu Dinh and Tran, Truyen and Phung, Dinh and Venkatesh, Svetha},
+  editor = {Cao, Tru and Lim, Ee-Peng and Zhou, Zhi-Hua and Ho, Tu-Bao and Cheung, David and Motoda, Hiroshi},
+  title = {Stabilizing Sparse Cox Model Using Statistic and Semantic Structures in Electronic Medical Records},
+  booktitle = {Advances in Knowledge Discovery and Data Mining},
+  publisher = {Springer International Publishing},
+  year = {2015},
+  volume = {9078},
+  pages = {331-343},
+  url = {http://prada-research.net/~truyen/papers/pakdd_main.pdf},
+  doi = {10.1007/978-3-319-18032-8_26}
+}
+</pre></td>
+</tr>
+<tr id="gopakumar2015stabilizing" class="entry">
+	<td>Gopakumar S, Tran T, Nguyen TD, Phung D and Venkatesh S (2015), <i>"Stabilizing high-dimensional prediction models using feature graphs."</i>, IEEE journal of biomedical and health informatics.  Vol. 19(3), pp. 1044-1052.
+	<p class="infolinks">[<a href="javascript:toggleInfo('gopakumar2015stabilizing','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('gopakumar2015stabilizing','bibtex')">BibTeX</a>] [<a href="http://dx.doi.org/10.1109/JBHI.2014.2353031" target="_blank">DOI</a>] [<a href="http://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=6887285" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_gopakumar2015stabilizing" class="abstract noshow">
+	<td><b>Abstract</b>: We investigate feature stability in the context of clinical prognosis derived from high-dimensional electronic medical records. To reduce variance in the selected features that are predictive, we introduce Laplacian-based regularization into a regression model. The Laplacian is derived on a feature graph that captures both the temporal and hierarchic relations between hospital events, diseases, and interventions. Using a cohort of patients with heart failure, we demonstrate better feature stability and goodness-of-fit through feature graph stabilization.</td>
+</tr>
+<tr id="bib_gopakumar2015stabilizing" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{gopakumar2015stabilizing,
+  author = {Gopakumar, S and Tran, Truyen and Nguyen, Tu Dinh and Phung, Dinh and Venkatesh, Svetha},
+  title = {Stabilizing high-dimensional prediction models using feature graphs.},
+  journal = {IEEE journal of biomedical and health informatics},
+  year = {2015},
+  volume = {19},
+  number = {3},
+  pages = {1044--1052},
+  url = {http://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&amp;arnumber=6887285},
+  doi = {10.1109/JBHI.2014.2353031}
+}
+</pre></td>
+</tr>
+<tr id="gupta_rana_phung_venkatesh_sdm15" class="entry">
+	<td>Gupta S, Rana S, Phung D and Venkatesh S (2015), <i>"What shall I share and with Whom? - A Multi-Task Learning Formulation using Multi-Faceted Task Relationships"</i>, In SIAM International Conference on Data Mining. Vancouver, Canada , pp. 703-711.
+	<p class="infolinks">[<a href="javascript:toggleInfo('gupta_rana_phung_venkatesh_sdm15','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('gupta_rana_phung_venkatesh_sdm15','bibtex')">BibTeX</a>] [<a href="http://epubs.siam.org/doi/pdf/10.1137/1.9781611974010.79" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_gupta_rana_phung_venkatesh_sdm15" class="abstract noshow">
+	<td><b>Abstract</b>: Multi-task learning is a learning paradigm that improves the performance of "related" tasks through their joint learning. To do this each task answers the question "Which other task should I share with"? This task relatedness can be complex - a task may be related to one set of tasks based on one subset of features and to other tasks based on other subsets. Existing multi-task learning methods do not explicitly model this reality, learning a single-faceted task relationship over all the features. This degrades performance by forcing a task to become similar to other tasks even on their unrelated features. Addressing this gap, we propose a novel multi-task learning model that learns multi-faceted task relationship, allowing tasks to collaborate differentially on different feature subsets. This is achieved by simultaneously learning a low dimensional subspace for task parameters and inducing task groups over each latent subspace basis using a novel combination of L_1 and pairwise L_infty norms. Further, our model can induce grouping across both positively and negatively related tasks, which helps towards exploiting knowledge from all types of related tasks. We validate our model on two synthetic and five real datasets, and show significant performance improvements over several state of-the-art multi-task learning techniques. Thus our model effectively answers for each task: What shall I share and with whom?</td>
+</tr>
+<tr id="bib_gupta_rana_phung_venkatesh_sdm15" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{gupta_rana_phung_venkatesh_sdm15,
+  author = {Gupta, S.K. and Rana, S. and Phung, D. and Venkatesh, Svetha.},
+  title = {What shall I share and with Whom? - A Multi-Task Learning Formulation using Multi-Faceted Task Relationships},
+  booktitle = {SIAM International Conference on Data Mining},
+  year = {2015},
+  pages = {703-711},
+  url = {http://epubs.siam.org/doi/pdf/10.1137/1.9781611974010.79}
+}
+</pre></td>
+</tr>
+<tr id="gupta2015collaborating" class="entry">
+	<td>Gupta SK, Rana S, Phung D and Venkatesh S (2015), <i>"Collaborating Differently on Different Topics: A Multi-Relational Approach to Multi-Task Learning"</i>, In Advances in Knowledge Discovery and Data Mining. , pp. 303-316. Springer.
+	<p class="infolinks">[<a href="javascript:toggleInfo('gupta2015collaborating','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('gupta2015collaborating','bibtex')">BibTeX</a>] [<a href="http://link.springer.com/chapter/10.1007/978-3-319-18038-0_24" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_gupta2015collaborating" class="abstract noshow">
+	<td><b>Abstract</b>: Multi-task learning offers a way to benefit from synergy of multiple related prediction tasks via their joint modeling. Current multi-task techniques model related tasks jointly, assuming that the tasks share the same relationship across features uniformly. This assumption is seldom true as tasks may be related across some features but not others. Addressing this problem, we propose a new multi-task learning model that learns separate task relationships along different features. This added flexibility allows our model to have a finer and differential level of control in joint modeling of tasks along different features. We formulate the model as an optimization problem and provide an efficient, iterative solution. We illustrate the behavior of the proposed model using a synthetic dataset where we induce varied feature-dependent task relationships: positive relationship, negative relationship, no relationship. Using four real datasets, we evaluate the effectiveness of the proposed model for many multi-task regression and classification problems, and demonstrate its superiority over other state-of-the-art multi-task learning models.</td>
+</tr>
+<tr id="bib_gupta2015collaborating" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@incollection{gupta2015collaborating,
+  author = {Gupta, Sunil Kumar and Rana, Santu and Phung, Dinh and Venkatesh, Svetha},
+  title = {Collaborating Differently on Different Topics: A Multi-Relational Approach to Multi-Task Learning},
+  booktitle = {Advances in Knowledge Discovery and Data Mining},
+  publisher = {Springer},
+  year = {2015},
+  pages = {303--316},
+  url = {http://link.springer.com/chapter/10.1007/978-3-319-18038-0_24}
+}
+</pre></td>
+</tr>
+<tr id="huynh2015learning" class="entry">
+	<td>Huynh V, Phung D, Nguyen L, Venkatesh S and Bui HH (2015), <i>"Learning Conditional Latent Structures from Multiple Data Sources"</i>, In Advances in Knowledge Discovery and Data Mining. , pp. 343-354. Springer.
+	<p class="infolinks">[<a href="javascript:toggleInfo('huynh2015learning','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('huynh2015learning','bibtex')">BibTeX</a>] [<a href="http://prada-research.net/~svetha/papers/2015/Huynh_pakdd15.pdf" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_huynh2015learning" class="abstract noshow">
+	<td><b>Abstract</b>: Data usually present in heterogeneous sources. When dealing with multiple data sources, existing models often treat them independently and thus can not explicitly model the correlation structures among data sources. To address this problem, we propose a full Bayesian nonparametric approach to model correlation structures among multiple and heterogeneous datasets. The proposed framework, first, induces mixture distribution over primary data source using hierarchical Dirichlet processes (HDP). Once conditioned on each atom (group) discovered in previous step, context data sources are mutually independent and each is generated from hierarchical Dirichlet processes. In each specific application, which covariates constitute content or context(s) is determined by the nature of data. We also derive the efficient inference and exploit the conditional independence structure to propose (conditional) parallel Gibbs sampling scheme. We demonstrate our model to address the problem of latent activities discovery in pervasive computing using mobile data. We show the advantage of utilizing multiple data sources in terms of exploratory analysis as well as quantitative clustering performance.</td>
+</tr>
+<tr id="bib_huynh2015learning" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@incollection{huynh2015learning,
+  author = {Huynh, Viet and Phung, Dinh and Nguyen, Long and Venkatesh, Svetha and Bui, Hung H},
+  title = {Learning Conditional Latent Structures from Multiple Data Sources},
+  booktitle = {Advances in Knowledge Discovery and Data Mining},
+  publisher = {Springer},
+  year = {2015},
+  pages = {343--354},
+  url = {http://prada-research.net/~svetha/papers/2015/Huynh_pakdd15.pdf}
+}
+</pre></td>
+</tr>
+<tr id="Kamkar_et_al_jbi14" class="entry">
+	<td>Kamkar I, Gupta S, Phung D and Venkatesh S (2015), <i>"Stable Feature Selection for Clinical Prediction: Exploiting ICD tree structure using Tree-Lasso"</i>, The Journal of Biomedical Informatics. , pp. 277-290.
+	<p class="infolinks">[<a href="javascript:toggleInfo('Kamkar_et_al_jbi14','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('Kamkar_et_al_jbi14','bibtex')">BibTeX</a>] [<a href="http://www.sciencedirect.com/science/article/pii/S1532046414002639" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_Kamkar_et_al_jbi14" class="abstract noshow">
+	<td><b>Abstract</b>: Modern healthcare is getting reshaped by growing Electronic Medical Records (EMR). Recently, these records have been shown of great value towards building clinical prediction models. In EMR data, patients' diseases and hospital interventions are captured through a set of diagnoses and procedures codes. These codes are usually represented in a tree form (e.g. ICD-10 tree) and the codes within a tree branch may be highly correlated. These codes can be used as features to build a prediction model and an appropriate feature selection can inform a clinician about important risk factors for a disease. Traditional feature selection methods (e.g. Information Gain, T-test, etc.) consider each variable independently and usually end up having a long feature list. Recently, Lasso and related l1-penalty based feature selection methods have become popular due to their joint feature selection property. However, Lasso is known to have problems of selecting one feature of many correlated features randomly. This hinders the clinicians to arrive at a stable feature set, which is crucial for clinical decision making process. In this paper, we solve this problem by using a recently proposed Tree-Lasso model. Since, the stability behavior of Tree-Lasso is not well understood, we study the stability behavior of Tree-Lasso and compare it with other feature selection methods. Using a synthetic and two real-world datasets (Cancer and Acute Myocardial Infarction), we show that Tree-Lasso based feature selection is significantly more stable than Lasso and comparable to other methods e.g. Information Gain, ReliefF and T-test. We further show that, using different types of classifiers such as logistic regression, naive Bayes, support vector machines, decision trees and Random Forest, the classification performance of Tree-Lasso is comparable to Lasso and better than other methods. Our result has implications in identifying stable risk factors for many healthcare problems and therefore can potentially assist clinical decision making for accurate medical prognosis.</td>
+</tr>
+<tr id="bib_Kamkar_et_al_jbi14" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{Kamkar_et_al_jbi14,
+  author = {Kamkar, I. and Gupta, S. and Phung, D. and Venkatesh, Svetha.},
+  title = {Stable Feature Selection for Clinical Prediction: Exploiting ICD tree structure using Tree-Lasso},
+  journal = {The Journal of Biomedical Informatics},
+  year = {2015},
+  pages = {277--290},
+  url = {http://www.sciencedirect.com/science/article/pii/S1532046414002639}
+}
+</pre></td>
+</tr>
+<tr id="kamkar_gupta_phung_ai15" class="entry">
+	<td>Kamkar I, Gupta S, Phung D and Venkatesh S (2015), <i>"Stable Feature Selection with Support Vector Machines"</i>, In The 28th Australasian Joint Conference on Artificial Intelligence. Paris, France , pp. 298-308.
+	<p class="infolinks">[<a href="javascript:toggleInfo('kamkar_gupta_phung_ai15','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('kamkar_gupta_phung_ai15','bibtex')">BibTeX</a>] [<a href="http://link.springer.com/chapter/10.1007/978-3-319-26350-2_26" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_kamkar_gupta_phung_ai15" class="abstract noshow">
+	<td><b>Abstract</b>: The support vector machine (SVM) is a popular method for classification, well known for finding the maximum-margin hyperplane. Combining SVM with l1-norm penalty further enables it to simultaneously perform feature selection and margin maximization within a single framework. However, l1-norm SVM shows instability in selecting features in presence of correlated features. We propose a new method to increase the stability of l1-norm SVM by encouraging similarities between feature weights based on feature correlations, which is captured via a feature covariance matrix. Our proposed method can capture both positive and negative correlations between features. We formulate the model as a convex optimization problem and propose a solution based on alternating minimization. Using both synthetic and real-world datasets, we show that our model achieves better stability and classification accuracy compared to several state-of-the-art regularized classification methods.</td>
+</tr>
+<tr id="bib_kamkar_gupta_phung_ai15" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{kamkar_gupta_phung_ai15,
+  author = {Kamkar, Iman and Gupta, Sunil and Phung, Dinh and Venkatesh, Svetha},
+  title = {Stable Feature Selection with Support Vector Machines},
+  booktitle = {The 28th Australasian Joint Conference on Artificial Intelligence},
+  year = {2015},
+  pages = {298-308},
+  url = {http://link.springer.com/chapter/10.1007/978-3-319-26350-2_26}
+}
+</pre></td>
+</tr>
+<tr id="kamkar_gupta_phung_dsaa15" class="entry">
+	<td>Kamkar I, Gupta S, Phung D and Venkatesh S (2015), <i>"Exploiting Feature Relationships Towards Stable Feature Selection"</i>, In International Conference on Data Science and Advanced Analytics (DSAA2015). Paris, France , pp. 1-10.
+	<p class="infolinks">[<a href="javascript:toggleInfo('kamkar_gupta_phung_dsaa15','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('kamkar_gupta_phung_dsaa15','bibtex')">BibTeX</a>] [<a href="http://ieeexplore.ieee.org/xpls/abs_all.jsp?arnumber=7344859" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_kamkar_gupta_phung_dsaa15" class="abstract noshow">
+	<td><b>Abstract</b>: Feature selection is an important step in building predictive models for most real-world problems. One of the popular methods in feature selection is Lasso. However, it shows instability in selecting features when dealing with correlated features. In this work, we propose a new method that aims to increase the stability of Lasso by encouraging similarities between features based on their relatedness, which is captured via a feature covariance matrix. Besides modeling positive feature correlations, our method can also identify negative correlations between features. We propose a convex formulation for our model along with an alternating optimization algorithm that can learn the weights of the features as well as the relationship between them. Using both synthetic and real-world data, we show that the proposed method is more stable than Lasso and many state-of-the-art shrinkage and feature selection methods. Also, its predictive performance is comparable to other methods.</td>
+</tr>
+<tr id="bib_kamkar_gupta_phung_dsaa15" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{kamkar_gupta_phung_dsaa15,
+  author = {Kamkar, Iman and Gupta, Sunil and Phung, Dinh and Venkatesh, Svetha},
+  title = {Exploiting Feature Relationships Towards Stable Feature Selection},
+  booktitle = {International Conference on Data Science and Advanced Analytics (DSAA2015)},
+  year = {2015},
+  pages = {1-10},
+  url = {http://ieeexplore.ieee.org/xpls/abs_all.jsp?arnumber=7344859}
+}
+</pre></td>
+</tr>
+<tr id="li_rana_phung_venkatesh_pakdd15" class="entry">
+	<td>Li C, Rana S, Phung D and Venkatesh S (2015), <i>"Small-Variance Asymptotics for Bayesian Nonparametric Models with Constraints"</i>, In Pacific-Asia Conference on Knowledge Discovery and Data Mining (PAKDD). Ho Chi Minh City, Vietnam , pp. 92-105.
+	<p class="infolinks">[<a href="javascript:toggleInfo('li_rana_phung_venkatesh_pakdd15','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('li_rana_phung_venkatesh_pakdd15','bibtex')">BibTeX</a>] [<a href="http://prada-research.net/~svetha/papers/2015/li_rana_phung_venkatesh_pakdd15.pdf" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_li_rana_phung_venkatesh_pakdd15" class="abstract noshow">
+	<td><b>Abstract</b>: The users often have additional knowledge when Bayesian nonparametric models (BNP) are employed, e.g. for clustering there may be prior knowledge that some of the data instances should be in the same cluster (must-link constraint) or in different clusters (cannot-link constraint), and similarly for topic modeling some words should be grouped together or separately because of an underlying semantic. This can be achieved by imposing appropriate sampling probabilities based on such constraints. However, the traditional inference technique of BNP models via Gibbs sampling is time consuming and is not scalable for large data. Variational approximations are faster but many times they do not offer good solutions. Addressing this we present a small-variance asymptotic analysis of the MAP estimates of BNP models with constraints. We derive the objective function for Dirichlet process mixture model with constraints and devise a simple and efficient K-means type algorithm. We further extend the small-variance analysis to hierarchical BNP models with constraints and devise a similar simple objective function. Experiments on synthetic and real data sets demonstrate the efficiency and effectiveness of our algorithms.</td>
+</tr>
+<tr id="bib_li_rana_phung_venkatesh_pakdd15" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{li_rana_phung_venkatesh_pakdd15,
+  author = {Li, C. and Rana, S. and Phung, D and Venkatesh, Svetha.},
+  title = {Small-Variance Asymptotics for Bayesian Nonparametric Models with Constraints},
+  booktitle = {Pacific-Asia Conference on Knowledge Discovery and Data Mining (PAKDD)},
+  year = {2015},
+  pages = {92-105},
+  url = {http://prada-research.net/~svetha/papers/2015/li_rana_phung_venkatesh_pakdd15.pdf}
+}
+</pre></td>
+</tr>
+<tr id="luo_nguyen_tran_et_al_plosone15" class="entry">
+	<td>Luo W, Nguyen T, Nichols M, Tran T, Rana S, Gupta S, Phung D, Venkatesh S and Allender S (2015), <i>"Is Demography Destiny? Application of Machine Learning Techniques to Accurately Predict Population Health Outcomes from a Minimal Demographic Dataset"</i>, PLoS ONE., 05, 2015.  Vol. 10(5), pp. e0125602. Public Library of Science.
+	<p class="infolinks">[<a href="javascript:toggleInfo('luo_nguyen_tran_et_al_plosone15','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('luo_nguyen_tran_et_al_plosone15','bibtex')">BibTeX</a>] [<a href="http://dx.doi.org/10.1371/journal.pone.0125602" target="_blank">DOI</a>] [<a href="http://journals.plos.org/plosone/article?id=10.1371/journal.pone.0125602" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_luo_nguyen_tran_et_al_plosone15" class="abstract noshow">
+	<td><b>Abstract</b>: For years, we have relied on population surveys to keep track of regional public health statistics, including the prevalence of non-communicable diseases. Because of the cost and limitations of such surveys, we often do not have the up-to-date data on health outcomes of a region. In this paper, we examined the feasibility of inferring regional health outcomes from socio-demographic data that are widely available and timely updated through national censuses and community surveys. Using data for 50 American states (excluding Washington DC) from 2007 to 2012, we constructed a machine-learning model to predict the prevalence of six non-communicable disease (NCD) outcomes (four NCDs and two major clinical risk factors), based on population socio-demographic characteristics from the American Community Survey. We found that regional prevalence estimates for non-communicable diseases can be reasonably predicted. The predictions were highly correlated with the observed data, in both the states included in the derivation model (median correlation 0.88) and those excluded from the development for use as a completely separated validation sample (median correlation 0.85), demonstrating that the model had sufficient external validity to make good predictions, based on demographics alone, for areas not included in the model development. This highlights both the utility of this sophisticated approach to model development, and the vital importance of simple socio-demographic characteristics as both indicators and determinants of chronic disease.</td>
+</tr>
+<tr id="bib_luo_nguyen_tran_et_al_plosone15" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{luo_nguyen_tran_et_al_plosone15,
+  author = {Luo, Wei and Nguyen, Thin and Nichols, Melanie and Tran, Truyen and Rana, Santu and Gupta, Sunil and Phung, Dinh and Venkatesh, Svetha and Allender, Steve},
+  title = {Is Demography Destiny? Application of Machine Learning Techniques to Accurately Predict Population Health Outcomes from a Minimal Demographic Dataset},
+  journal = {PLoS ONE},
+  publisher = {Public Library of Science},
+  year = {2015},
+  volume = {10},
+  number = {5},
+  pages = {e0125602},
+  url = {http://journals.plos.org/plosone/article?id=10.1371/journal.pone.0125602},
+  doi = {10.1371/journal.pone.0125602}
+}
+</pre></td>
+</tr>
+<tr id="dang_wei_dinh_svetha_ai15" class="entry">
+	<td>Nguyen D, Luo W, Phung D and Venkatesh S (2015), <i>"Understanding toxicities and complications of cancer treatment: A data mining approach"</i>, In 28th Australasian Joint Conference on Artificial Intelligence. , pp. 431-443.
+	<p class="infolinks">[<a href="javascript:toggleInfo('dang_wei_dinh_svetha_ai15','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('dang_wei_dinh_svetha_ai15','bibtex')">BibTeX</a>] [<a href="http://link.springer.com/chapter/10.1007%2F978-3-319-26350-2_38" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_dang_wei_dinh_svetha_ai15" class="abstract noshow">
+	<td><b>Abstract</b>: Cancer remains a major challenge in modern medicine. Increasing prevalence of cancer, particularly in developing countries, demands better understanding of the effectiveness and adverse consequences of different cancer treatment regimes in real patient population. Current understanding of cancer treatment toxicities is often derived from either “clean” patient cohorts or coarse population statistics. It is difficult to get up-to-date and local assessment of treatment toxicities for specific cancer centres. In this paper, we applied an Apriori-based method for discovering toxicity progression patterns in the form of temporal association rules. Our experiments show the effectiveness of the proposed method in discovering major toxicity patterns in comparison with the pairwise association analysis. Our method is applicable for most cancer centres with even rudimentary electronic medical records and has the potential to provide real-time surveillance and quality assurance in cancer care.</td>
+</tr>
+<tr id="bib_dang_wei_dinh_svetha_ai15" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{dang_wei_dinh_svetha_ai15,
+  author = {Nguyen, Dang and Luo, Wei and Phung, Dinh and Venkatesh, Svetha},
+  title = {Understanding toxicities and complications of cancer treatment: A data mining approach},
+  booktitle = {28th Australasian Joint Conference on Artificial Intelligence},
+  year = {2015},
+  pages = {431--443},
+  url = {http://link.springer.com/chapter/10.1007%2F978-3-319-26350-2_38}
+}
+</pre></td>
+</tr>
+<tr id="thin_etal_15tac" class="entry">
+	<td>Nguyen T, Duong T, Venkatesh S and Phung D (2015), <i>"Autism Blogs: Expressed Emotion, Language Styles and Concerns in Personal and Community Settings"</i>, IEEE Transactions on Affective Computing., July, 2015.  Vol. 6(3), pp. 312-323.
+	<p class="infolinks">[<a href="javascript:toggleInfo('thin_etal_15tac','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('thin_etal_15tac','bibtex')">BibTeX</a>] [<a href="http://dx.doi.org/10.1109/TAFFC.2015.2400912" target="_blank">DOI</a>] [<a href="http://prada-research.net/~svetha/papers/2015/Nguyen_etal_15Autism.pdf" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_thin_etal_15tac" class="abstract noshow">
+	<td><b>Abstract</b>: The Internet has provided an ever increasingly popular platform for individuals to voice their thoughts, and like-minded people to share stories. This unintentionally leaves characteristics of individuals and communities, which are often difficult to be collected in traditional studies. Individuals with autism are such a case, in which the Internet could facilitate even more communication given its social-spatial distance being a characteristic preference for individuals with autism. Previous studies examined the traces left in the posts of online autism communities (Autism) in comparison with other online communities (Control). This work further investigates these online populations through the contents of not only their posts but also their comments. We first compare the Autism and Control blogs based on three features: topics, language styles and affective information. The autism groups are then further examined, based on the same three features, by looking at their personal (Personal) and community (Community) blogs separately. Machine learning and statistical methods are used to discriminate blog contents in both cases. All three features are found to be significantly different between Autism and Control, and between autism Personal and Community. These features also show good indicative power in prediction of autism blogs in both personal and community settings.</td>
+</tr>
+<tr id="bib_thin_etal_15tac" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{thin_etal_15tac,
+  author = {Nguyen, Thin and Duong, Thi and Venkatesh, Svetha and Phung, Dinh},
+  title = {Autism Blogs: Expressed Emotion, Language Styles and Concerns in Personal and Community Settings},
+  journal = {IEEE Transactions on Affective Computing},
+  year = {2015},
+  volume = {6},
+  number = {3},
+  pages = {312-323},
+  url = {http://prada-research.net/~svetha/papers/2015/Nguyen_etal_15Autism.pdf},
+  doi = {10.1109/TAFFC.2015.2400912}
+}
+</pre></td>
+</tr>
+<tr id="nguyen2015continuous" class="entry">
+	<td>Nguyen T, Gupta S, Venkatesh S and Phung D (2015), <i>"Continuous discovery of co-location contexts from Bluetooth data"</i>, Pervasive and Mobile Computing.  Vol. 16, pp. 286-304. Elsevier.
+	<p class="infolinks">[<a href="javascript:toggleInfo('nguyen2015continuous','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('nguyen2015continuous','bibtex')">BibTeX</a>] [<a href="http://www.sciencedirect.com/science/article/pii/S1574119214001941" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_nguyen2015continuous" class="abstract noshow">
+	<td><b>Abstract</b>: The discovery of contexts is important for context-aware applications in pervasive computing. This is a challenging problem because of the stream nature of data, the complexity and changing nature of contexts. We propose a Bayesian nonparametric model for the detection of co-location contexts from Bluetooth signals. By using an Indian buffet process as the prior distribution, the model can discover the number of contexts automatically. We introduce a novel fixed-lag particle filter that processes data incrementally. This sampling scheme is especially suitable for pervasive computing as the computational requirements remain constant in spite of growing data. We examine our model on a synthetic dataset and two real world datasets. To verify the discovered contexts, we compare them to the communities detected by the Louvain method, showing a strong correlation between the results of the two methods. Fixed-lag particle filter is compared with Gibbs sampling in terms of the normalized factorization error that shows a close performance between the two inference methods. As fixed-lag particle filter processes a small chunk of data when it comes and does not need to be restarted, its execution time is significantly shorter than that of Gibbs sampling.</td>
+</tr>
+<tr id="bib_nguyen2015continuous" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{nguyen2015continuous,
+  author = {Nguyen, Thuong and Gupta, Sunil and Venkatesh, Svetha and Phung, Dinh},
+  title = {Continuous discovery of co-location contexts from Bluetooth data},
+  journal = {Pervasive and Mobile Computing},
+  publisher = {Elsevier},
+  year = {2015},
+  volume = {16},
+  pages = {286--304},
+  url = {http://www.sciencedirect.com/science/article/pii/S1574119214001941}
+}
+</pre></td>
+</tr>
+<tr id="thin_etal_15wise" class="entry">
+	<td>Nguyen T, O'Dea B, Larsen M, Phung D, Venkatesh S and Christensen H (2015), <i>"Differentiating sub-groups of online depression-related communities using textual cues"</i>, In International Conference on Web Information Systems Engineering.  Springer International Publishing.
+	<p class="infolinks">[<a href="javascript:toggleInfo('thin_etal_15wise','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('thin_etal_15wise','bibtex')">BibTeX</a>] [<a href="http://link.springer.com/chapter/10.1007/978-3-319-26187-4_17" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_thin_etal_15wise" class="abstract noshow">
+	<td><b>Abstract</b>: Depression is a highly prevalent mental illness and is a comorbidity of other mental and behavioural disorders. The Internet allows individuals who are depressed or caring for those who are depressed, to connect with others via online communities; however, the characteristics of these online conversations and the language styles of those interested in depression have not yet been fully explored. This work aims to explore the textual cues of online communities interested in depression. A random sample of 5,000 blog posts was crawled. Five groupings were identified: depression, bipolar, self-harm, grief, and suicide. Independent variables included psycholinguistic processes and content topics extracted from the posts. Machine learning techniques were used to discriminate messages posted in the depression sub-group from the others. Good predictive validity in depression classification using topics and psycholinguistic clues as features was found. Clear discrimination between writing styles and content, with good predictive power is an important step in understanding social media and its use in mental health.</td>
+</tr>
+<tr id="bib_thin_etal_15wise" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@incollection{thin_etal_15wise,
+  author = {Nguyen, Thin and O'Dea, Bridianne and Larsen, Mark and Phung, Dinh and Venkatesh, Svetha and Christensen, Helen},
+  title = {Differentiating sub-groups of online depression-related communities using textual cues},
+  booktitle = {International Conference on Web Information Systems Engineering},
+  publisher = {Springer International Publishing},
+  year = {2015},
+  url = {http://link.springer.com/chapter/10.1007/978-3-319-26187-4_17}
+}
+</pre></td>
+</tr>
+<tr id="thin_etal_15jech" class="entry">
+	<td>Nguyen T, Tran T, Luo W, Gupta S, Rana S, Phung D, Nichols M, Millar L, Venkatesh S and Allender S (2015), <i>"Web search activity data accurately predict population chronic disease risk in the USA"</i>, Journal of Epidemiology and Community Health.  Vol. 69(7), pp. 693-699.
+	<p class="infolinks">[<a href="javascript:toggleInfo('thin_etal_15jech','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('thin_etal_15jech','bibtex')">BibTeX</a>] [<a href="http://dx.doi.org/10.1136/jech-2014-204523" target="_blank">DOI</a>] [<a href="http://jech.bmj.com/content/early/2015/03/24/jech-2014-204523.abstract" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_thin_etal_15jech" class="abstract noshow">
+	<td><b>Abstract</b>: The WHO framework for non-communicable disease (NCD) describes risks and outcomes comprising the majority of the global burden of disease. These factors are complex and interact at biological, behavioural, environmental and policy levels presenting challenges for population monitoring and intervention evaluation. This paper explores the utility of machine learning methods applied to population-level web search activity behaviour as a proxy for chronic disease risk factors. Web activity output for each element of the WHO's Causes of NCD framework was used as a basis for identifying relevant web search activity from 2004 to 2013 for the USA. Multiple linear regression models with regularisation were used to generate predictive algorithms, mapping web search activity to Centers for Disease Control and Prevention (CDC) measured risk factor/disease prevalence. Predictions for subsequent target years not included in the model derivation were tested against CDC data from population surveys using Pearson correlation and Spearman's r. For 2011 and 2012, predicted prevalence was very strongly correlated with measured risk data ranging from fruits and vegetables consumed (r=0.81; 95% CI 0.68 to 0.89) to alcohol consumption (r=0.96; 95% CI 0.93 to 0.98). Mean difference between predicted and measured differences by State ranged from 0.03 to 2.16. Spearman's r for state-wise predicted versus measured prevalence varied from 0.82 to 0.93.Conclusions The high predictive validity of web search activity for NCD risk has potential to provide real-time information on population risk during policy implementation and other population-level NCD prevention efforts.</td>
+</tr>
+<tr id="bib_thin_etal_15jech" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{thin_etal_15jech,
+  author = {Nguyen, Thin and Tran, Truyen and Luo, Wei and Gupta, Sunil and Rana, Santu and Phung, Dinh and Nichols, Melanie and Millar, Lynne and Venkatesh, Svetha and Allender, Steve},
+  title = {Web search activity data accurately predict population chronic disease risk in the USA},
+  journal = {Journal of Epidemiology and Community Health},
+  year = {2015},
+  volume = {69},
+  number = {7},
+  pages = {693--699},
+  url = {http://jech.bmj.com/content/early/2015/03/24/jech-2014-204523.abstract},
+  doi = {10.1136/jech-2014-204523}
+}
+</pre></td>
+</tr>
+<tr id="tu_truyen_phung_venkatesh_aaai15" class="entry">
+	<td>Nguyen TD, Tran T, Phung D and Venkatesh S (2015), <i>"Tensor-variate Restricted Boltzmann Machines"</i>, In AAAI Conference on Artificial Intelligence. Austin Texas, USA, January 25-30, 2015. , pp. 2887-2893.
+	<p class="infolinks">[<a href="javascript:toggleInfo('tu_truyen_phung_venkatesh_aaai15','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('tu_truyen_phung_venkatesh_aaai15','bibtex')">BibTeX</a>] [<a href="http://prada-research.net/~svetha/papers/2015/tu_etal_aaai15_tvrbm.pdf" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_tu_truyen_phung_venkatesh_aaai15" class="abstract noshow">
+	<td><b>Abstract</b>: Restricted Boltzmann Machines (RBMs) are an important class of latent variable models for representing vector data. An under-explored area is multimode data, where each data point is a matrix or a tensor. Standard RBMs applying to such data would require vectorizing matrices and tensors, thus resulting in unnecessarily high dimensionality and at the same time, destroying the inherent higher-order interaction structures. This paper introduces Tensor-variate Restricted Boltzmann Machines (TvRBMs) which generalize RBMs to capture the multiplicative interaction between data modes and the latent variables. TvRBMs are highly compact in that the number of free parameters grows only linear with the number of modes. We demonstrate the capacity of TvRBMs on three real-world applications: handwritten digit classification, face recognition and EEG-based alcoholic diagnosis. The learnt features of the model are more discriminative than the rivals, resulting in better classification performance.</td>
+</tr>
+<tr id="bib_tu_truyen_phung_venkatesh_aaai15" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{tu_truyen_phung_venkatesh_aaai15,
+  author = {Nguyen, Tu Dinh and Tran, Truyen and Phung, Dinh and Venkatesh, Svetha},
+  title = {Tensor-variate Restricted Boltzmann Machines},
+  booktitle = {AAAI Conference on Artificial Intelligence},
+  year = {2015},
+  pages = {2887-2893},
+  url = {http://prada-research.net/~svetha/papers/2015/tu_etal_aaai15_tvrbm.pdf}
+}
+</pre></td>
+</tr>
+<tr id="nguyen_phung_pham_venkatesh_ads15" class="entry">
+	<td>Nguyen V, Phung D, Pham D-S and Venkatesh S (2015), <i>"Bayesian Nonparametric Approaches to Abnormality Detection in Video Surveillance"</i>, Annals of Data Science. , pp. 1-21. Springer Berlin Heidelberg.
+	<p class="infolinks">[<a href="javascript:toggleInfo('nguyen_phung_pham_venkatesh_ads15','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('nguyen_phung_pham_venkatesh_ads15','bibtex')">BibTeX</a>] [<a href="http://link.springer.com/article/10.1007/s40745-015-0030-3" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_nguyen_phung_pham_venkatesh_ads15" class="abstract noshow">
+	<td><b>Abstract</b>: In data science, anomaly detection is the process of identifying the items, events or observations which do not conform to expected patterns in a dataset. As widely acknowledged in the computer vision community and security management, discovering suspicious events is the key issue for abnormal detection in video surveillance. The important steps in identifying such events include stream data segmentation and hidden patterns discovery. However, the crucial challenge in stream data segmentation and hidden patterns discovery are the number of coherent segments in surveillance stream and the number of traffic patterns are unknown and hard to specify. Therefore, in this paper we revisit the abnormality detection problem through the lens of Bayesian nonparametric (BNP) and develop a novel usage of BNP methods for this problem. In particular, we employ the Infinite Hidden Markov Model and Bayesian Nonparametric Factor Analysis for stream data segmentation and pattern discovery. In addition, we introduce an interactive system allowing users to inspect and browse suspicious events.</td>
+</tr>
+<tr id="bib_nguyen_phung_pham_venkatesh_ads15" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{nguyen_phung_pham_venkatesh_ads15,
+  author = {Nguyen, Vu and Phung, Dinh and Pham, Duc-Son and Venkatesh, Svetha},
+  title = {Bayesian Nonparametric Approaches to Abnormality Detection in Video Surveillance},
+  journal = {Annals of Data Science},
+  publisher = {Springer Berlin Heidelberg},
+  year = {2015},
+  pages = {1--21},
+  url = {http://link.springer.com/article/10.1007/s40745-015-0030-3}
+}
+</pre></td>
+</tr>
+<tr id="nguyen2015topic" class="entry">
+	<td>Nguyen V, Phung D and Venkatesh S (2015), <i>"Topic Model Kernel Classification With Probabilistically Reduced Features"</i>, Journal of Data Science.  Vol. 13(2), pp. 323-340.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('nguyen2015topic','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_nguyen2015topic" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{nguyen2015topic,
+  author = {Nguyen, Vu and Phung, Dinh and Venkatesh, Svetha},
+  title = {Topic Model Kernel Classification With Probabilistically Reduced Features},
+  journal = {Journal of Data Science},
+  year = {2015},
+  volume = {13},
+  number = {2},
+  pages = {323--340}
+}
+</pre></td>
+</tr>
+<tr id="nguyen2015bayesian" class="entry">
+	<td>Nguyen V, Phung D, Venkatesh S and Bui HH (2015), <i>"A Bayesian Nonparametric Approach to Multilevel Regression"</i>, In Advances in Knowledge Discovery and Data Mining. , pp. 330-342. Springer.
+	<p class="infolinks">[<a href="javascript:toggleInfo('nguyen2015bayesian','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('nguyen2015bayesian','bibtex')">BibTeX</a>] [<a href="http://prada-research.net/~svetha/papers/2015/nguyen_phung_venkatesh_bui_pakdd15.pdf" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_nguyen2015bayesian" class="abstract noshow">
+	<td><b>Abstract</b>: Regression is at the cornerstone of statistical analysis. Multilevel regression, on the other hand, receives little research attention, though it is prevalent in economics, biostatistics and healthcare to name a few. We present a Bayesian nonparametric framework for multilevel regression where individuals including observations and outcomes are organized into groups. Furthermore, our approach exploits additional group-specific context observations, we use Dirichlet Process with product-space base measure in a nested structure to model group-level context distribution and the regression distribution to accommodate the multilevel structure of the data. The proposed model simultaneously partitions groups into cluster and perform regression. We provide collapsed Gibbs sampler for posterior inference. We perform extensive experiments on econometric panel data and healthcare longitudinal data to demonstrate the effectiveness of the proposed model.</td>
+</tr>
+<tr id="bib_nguyen2015bayesian" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@incollection{nguyen2015bayesian,
+  author = {Nguyen, Vu and Phung, Dinh and Venkatesh, Svetha and Bui, Hung H},
+  title = {A Bayesian Nonparametric Approach to Multilevel Regression},
+  booktitle = {Advances in Knowledge Discovery and Data Mining},
+  publisher = {Springer},
+  year = {2015},
+  pages = {330--342},
+  url = {http://prada-research.net/~svetha/papers/2015/nguyen_phung_venkatesh_bui_pakdd15.pdf}
+}
+</pre></td>
+</tr>
+<tr id="PhamAranVenk2015" class="entry">
+	<td>Pham D, Arandjelovi&#263; O and Venkatesh S (2015), <i>"Detection of dynamic background due to swaying movements from motion features."</i>, IEEE Transactions on Image Processing (TIP). 
+	<p class="infolinks">[<a href="javascript:toggleInfo('PhamAranVenk2015','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('PhamAranVenk2015','bibtex')">BibTeX</a>] [<a href="http://prada-research.net/~svetha/papers/2015/2014_IP_paper1.pdf" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_PhamAranVenk2015" class="abstract noshow">
+	<td><b>Abstract</b>: Dynamically changing background (dynamic background) still presents a great challenge to many motion-based video surveillance systems. In the context of event detection, it is a major source of false alarms. There is a strong need from the security industry either to detect and suppress these false alarms, or dampen the effects of background changes, so as to increase the sensitivity to meaningful events of interest. In this paper, we restrict our focus to one of the most common causes of dynamic background changes: (1) that of swaying tree branches and (2) their shadows under windy conditions. Considering the ultimate goal in a video analytics pipeline, we formulate a new dynamic background detection problem as a signal processing alternative to the previously described but unreliable computer vision-based approaches. Within this new framework, we directly reduce the number of false alarms by testing if the detected events are due to characteristic background motions. In addition, we introduce a new data set suitable for the evaluation of dynamic background detection. It consists of real-world events detected by a commercial surveillance system from two static surveillance cameras. The research question we address is whether dynamic background can be detected reliably and efficiently using simple motion features and in the presence of similar but meaningful events, such as loitering. Inspired by the tree aerodynamics theory, we propose a novel method named local variation persistence (LVP), that captures the key characteristics of swaying motions. The method is posed as a convex optimization problem, whose variable is the local variation. We derive a computationally efficient algorithm for solving the optimization problem, the solution of which is then used to form a powerful detection statistic. On our newly collected data set, we demonstrate that the proposed LVP achieves excellent detection results and outperforms the best alternative adapted from existing art - n the dynamic background literature.</td>
+</tr>
+<tr id="bib_PhamAranVenk2015" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{PhamAranVenk2015,
+  author = {Pham, D. and Arandjelovi&#263;, O. and Venkatesh, Svetha.},
+  title = {Detection of dynamic background due to swaying movements from motion features.},
+  journal = {IEEE Transactions on Image Processing (TIP)},
+  year = {2015},
+  url = {http://prada-research.net/~svetha/papers/2015/2014_IP_paper1.pdf}
+}
+</pre></td>
+</tr>
+<tr id="rana_gupta_phung_venkatesh_sam15" class="entry">
+	<td>Rana S, Gupta S, Phung D and Venkatesh S (2015), <i>"A Predictive Framework for Modeling Healthcare Data with Evolving Clinical Interventions"</i>, Statistical Analysis in Data Mining.  Vol. 8(3), pp. 162-182. Wiley Online Library.
+	<p class="infolinks">[<a href="javascript:toggleInfo('rana_gupta_phung_venkatesh_sam15','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('rana_gupta_phung_venkatesh_sam15','bibtex')">BibTeX</a>] [<a href="http://dx.doi.org/10.1002/sam.11262" target="_blank">DOI</a>] [<a href="http://onlinelibrary.wiley.com/doi/10.1002/sam.11262/pdf" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_rana_gupta_phung_venkatesh_sam15" class="abstract noshow">
+	<td><b>Abstract</b>: Medical interventions critically determine clinical outcomes. But prediction models either ignore interventions or dilute impact by building a single prediction rule by amalgamating interventions with other features. One rule across all interventions may not capture differential effects. Also, interventions change with time as innovations are made, requiring prediction models to evolve over time. To address these gaps, we propose a prediction framework that explicitly models interventions by extracting a set of latent intervention groups through a Hierarchical Dirichlet Process (HDP) mixture. Data are split in temporal windows and for each window, a separate distribution over the intervention groups is learnt. This ensures that the model evolves with changing interventions. The outcome is modeled as conditional, on both the latent grouping and the patients’ condition, through a Bayesian logistic regression. Learning distributions for each time-window result in an over-complex model when interventions do not change in every time-window. We show that by replacing HDP with a dynamic HDP prior, a more compact set of distributions can be learnt. Experiments performed on two hospital datasets demonstrate the superiority of our framework over many existing clinical and traditional prediction frameworks.</td>
+</tr>
+<tr id="bib_rana_gupta_phung_venkatesh_sam15" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{rana_gupta_phung_venkatesh_sam15,
+  author = {Rana, S. and Gupta, S.K. and Phung, D. and Venkatesh, Svetha.},
+  title = {A Predictive Framework for Modeling Healthcare Data with Evolving Clinical Interventions},
+  journal = {Statistical Analysis in Data Mining},
+  publisher = {Wiley Online Library},
+  year = {2015},
+  volume = {8},
+  number = {3},
+  pages = {162-182},
+  url = {http://onlinelibrary.wiley.com/doi/10.1002/sam.11262/pdf},
+  doi = {10.1002/sam.11262}
+}
+</pre></td>
+</tr>
+<tr id="rana_gupta_venkatesh_icdm15" class="entry">
+	<td>Rana S, Gupta S and Venkatesh S (2015), <i>"Differentially private random forest with high utility"</i>, In IEEE International Conference on Data Mining. Atlantic City, USA , pp. (accepted).
+	<p class="infolinks">[<a href="javascript:toggleInfo('rana_gupta_venkatesh_icdm15','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('rana_gupta_venkatesh_icdm15','bibtex')">BibTeX</a>] [<a href="2015/conferences/rana_gupta_venkatesh_icdm15.pdf" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_rana_gupta_venkatesh_icdm15" class="abstract noshow">
+	<td><b>Abstract</b>: Privacy-preserving data mining has become an active focus of the research community in the domains where data are sensitive and personal in nature. We propose a novel random forest algorithm under the framework of differential privacy. Unlike previous works that strictly follow differential privacy and keep the complete data distribution approximately invariant to change in one data instance, we only keep the necessary statistics (e.g. variance of the estimate) invariant. This relaxation results in significantly higher utility. To realize our approach, we propose a novel differentially private decision tree induction algorithm and use them to create an ensemble of decision trees. We also propose feasible adversary models to infer about the attribute and class label of unknown data in presence of the knowledge of all other data. Under these adversary models, we derive bounds on the maximum number of trees that are allowed in the ensemble while maintaining privacy. We focus on binary classification problem and demonstrate our approach on four real-world datasets. Compared to the existing privacy preserving approaches we achieve significantly higher utility.</td>
+</tr>
+<tr id="bib_rana_gupta_venkatesh_icdm15" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{rana_gupta_venkatesh_icdm15,
+  author = {Rana, S and Gupta, S.K. and Venkatesh, Svetha.},
+  title = {Differentially private random forest with high utility},
+  booktitle = {IEEE International Conference on Data Mining},
+  year = {2015},
+  pages = {(accepted)},
+  url = {2015/conferences/rana_gupta_venkatesh_icdm15.pdf}
+}
+</pre></td>
+</tr>
+<tr id="saha_sunil_svetha_dsaa15" class="entry">
+	<td>Saha B, Gupta S and Venkatesh S (2015), <i>"Improved Risk Predictions via Sparse Imputation of Patient Conditions in Electronic Medical Records"</i>, In IEEE International Conference on Data Science and Advanced Analytics. , pp. 1-10.
+	<p class="infolinks">[<a href="javascript:toggleInfo('saha_sunil_svetha_dsaa15','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('saha_sunil_svetha_dsaa15','bibtex')">BibTeX</a>] [<a href="http://ieeexplore.ieee.org/xpls/abs_all.jsp?arnumber=7344790" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_saha_sunil_svetha_dsaa15" class="abstract noshow">
+	<td><b>Abstract</b>: Electronic Medical Records (EMR) are increasingly used for risk prediction. EMR analysis is complicated by missing entries. There are two reasons the primary reason for admission is included in EMR, but the co-morbidities (other chronic diseases) are left uncoded, and, many zero values in the data are accurate, reflecting that a patient has not accessed medical facilities. A key challenge is to deal with the peculiarities of this data unlike many other datasets, EMR is sparse, reflecting the fact that patients have some, but not all diseases. We propose a novel model to fill-in these missing values, and use the new representation for prediction of key hospital events. To fill-in missing values, we represent the feature-patient matrix as a product of two low rank factors, preserving the sparsity property in the product. Intuitively, the product regularization allows sparse imputation of patient conditions reflecting common comorbidities across patients. We develop a scalable optimization algorithm based on Block coordinate descent method to find an optimal solution. We evaluate the proposed framework on two real world EMR cohorts: Cancer (7000 admissions) and Acute Myocardial Infarction (2652 admissions). Our result shows that the AUC for 3 months admission prediction is improved significantly from (0.741 to 0.786) for Cancer data and (0.678 to 0.724) for AMI data. We also extend the proposed method to a supervised model for predicting of multiple related risk outcomes (e.g. emergency presentations and admissions in hospital over 3, 6 and 12 months period) in an integrated framework. For this model, the AUC averaged over outcomes is improved significantly from (0.768 to 0.806) for Cancer data and (0.685 to 0.748) for AMI data.</td>
+</tr>
+<tr id="bib_saha_sunil_svetha_dsaa15" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{saha_sunil_svetha_dsaa15,
+  author = {Saha, Budhaditya and Gupta, Sunil and Venkatesh, Svetha},
+  title = {Improved Risk Predictions via Sparse Imputation of Patient Conditions in Electronic Medical Records},
+  booktitle = {IEEE International Conference on Data Science and Advanced Analytics},
+  year = {2015},
+  pages = {1--10},
+  url = {http://ieeexplore.ieee.org/xpls/abs_all.jsp?arnumber=7344790}
+}
+</pre></td>
+</tr>
+<tr id="saha2015prediciton" class="entry">
+	<td>Saha B, Gupta SK and Venkatesh S (2015), <i>"Prediciton of Emergency Events: A Multi-Task Multi-Label Learning Approach"</i>, In Advances in Knowledge Discovery and Data Mining. , pp. 226-238. Springer.
+	<p class="infolinks">[<a href="javascript:toggleInfo('saha2015prediciton','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('saha2015prediciton','bibtex')">BibTeX</a>] [<a href="http://link.springer.com/chapter/10.1007/978-3-319-18038-0_18" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_saha2015prediciton" class="abstract noshow">
+	<td><b>Abstract</b>: Prediction of patient outcomes is critical to plan resources in an hospital emergency department. We present a method to exploit longitudinal data from Electronic Medical Records (EMR), whilst exploiting multiple patient outcomes. We divide the EMR data into segments where each segment is a task, and all tasks are associated with multiple patient outcomes over a 3, 6 and 12 month period. We propose a model that learns a prediction function for each task-label pair, interacting through two subspaces: the first subspace is used to impose sharing across all tasks for a given label. The second subspace captures the task-specific variations and is shared across all the labels for a given task. The proposed model is formulated as an iterative optimization problems and solved using a scalable and efficient Block co-ordinate descent (BCD) method. We apply the proposed model on two hospital cohorts - Cancer and Acute Myocardial Infarction (AMI) patients collected over a two year period from a large hospital emergency department. We show that the predictive performance of our proposed models is significantly better than those of several state-of-the-art multi-task and multi-label learning methods.</td>
+</tr>
+<tr id="bib_saha2015prediciton" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@incollection{saha2015prediciton,
+  author = {Saha, Budhaditya and Gupta, Sunil K and Venkatesh, Svetha},
+  title = {Prediciton of Emergency Events: A Multi-Task Multi-Label Learning Approach},
+  booktitle = {Advances in Knowledge Discovery and Data Mining},
+  publisher = {Springer},
+  year = {2015},
+  pages = {226--238},
+  url = {http://link.springer.com/chapter/10.1007/978-3-319-18038-0_18}
+}
+</pre></td>
+</tr>
+<tr id="tran2015learning" class="entry">
+	<td>Tran T, Nguyen TD, Phung D and Venkatesh S (2015), <i>"Learning vector representation of medical objects via EMR-driven nonnegative restricted Boltzmann machines (eNRBM)"</i>, Journal of biomedical informatics.  Vol. 54, pp. 96-105. Elsevier.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('tran2015learning','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_tran2015learning" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{tran2015learning,
+  author = {Tran, Truyen and Nguyen, Tu Dinh and Phung, Dinh and Venkatesh, Svetha},
+  title = {Learning vector representation of medical objects via EMR-driven nonnegative restricted Boltzmann machines (eNRBM)},
+  journal = {Journal of biomedical informatics},
+  publisher = {Elsevier},
+  year = {2015},
+  volume = {54},
+  pages = {96--105}
+}
+</pre></td>
+</tr>
+<tr id="tran2015tree" class="entry">
+	<td>Tran T, Phung D and Venkatesh S (2015), <i>"Tree-based iterated local search for Markov random fields with applications in image analysis"</i>, Journal of Heuristics.  Vol. 21(1), pp. 25-45. Springer.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('tran2015tree','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_tran2015tree" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{tran2015tree,
+  author = {Tran, Truyen and Phung, Dinh and Venkatesh, Svetha},
+  title = {Tree-based iterated local search for Markov random fields with applications in image analysis},
+  journal = {Journal of Heuristics},
+  publisher = {Springer},
+  year = {2015},
+  volume = {21},
+  number = {1},
+  pages = {25--45}
+}
+</pre></td>
+</tr>
+<tr id="zhang2015visual" class="entry">
+	<td>Zhang X, Pham D-S, Phung D, Liu W, Saha B and Venkatesh S (2015), <i>"Visual Object Clustering via Mixed-Norm Regularization"</i>, In IEEE Winter Conference on Applications of Computer Vision (WACV). , pp. 1030-1037.
+	<p class="infolinks">[<a href="javascript:toggleInfo('zhang2015visual','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('zhang2015visual','bibtex')">BibTeX</a>] [<a href="http://ieeexplore.ieee.org/xpl/articleDetails.jsp?tp=&arnumber=7045996" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_zhang2015visual" class="abstract noshow">
+	<td><b>Abstract</b>: Many vision problems deal with high-dimensional data, such as motion segmentation and face clustering. However, these high-dimensional data usually lie in a low-dimensional structure. Sparse representation is a powerful principle for solving a number of clustering problems with high-dimensional data. This principle is motivated from an ideal modeling of data points according to linear algebra theory. However, real data in computer vision are unlikely to follow the ideal model perfectly. In this paper, we exploit the mixed norm regularization for sparse subspace clustering. This regularization term is a convex combination of the L1 norm, which promotes sparsity at the individual level and the block norm L2/1 which promotes group sparsity. Combining these powerful regularization terms will provide a more accurate modeling, subsequently leading to a better solution for the affinity matrix used in sparse subspace clustering. This could help us achieve better performance on motion segmentation and face clustering problems. This formulation also caters for different types of data corruptions. We derive a provably convergent algorithm based on the alternating direction method of multipliers (ADMM) framework, which is computationally efficient, to solve the formulation. We demonstrate that this formulation outperforms other state-of-arts on both motion segmentation and face clustering.</td>
+</tr>
+<tr id="bib_zhang2015visual" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{zhang2015visual,
+  author = {Zhang, Xin and Pham, Duc-Son and Phung, Dinh and Liu, Wanquan and Saha, Budhaditya and Venkatesh, Svetha},
+  title = {Visual Object Clustering via Mixed-Norm Regularization},
+  booktitle = {IEEE Winter Conference on Applications of Computer Vision (WACV)},
+  year = {2015},
+  pages = {1030--1037},
+  url = {http://ieeexplore.ieee.org/xpl/articleDetails.jsp?tp=&amp;arnumber=7045996}
+}
+</pre></td>
+</tr>
+<tr id="zhang2015mixed" class="entry">
+	<td>Zhang X, Pham D-S, Venkatesh S, Liu W and Phung D (2015), <i>"Mixed-norm sparse representation for multi view face recognition"</i>, Pattern Recognition.  Vol. 48(9), pp. 2935-2946. Elsevier.
+	<p class="infolinks">[<a href="javascript:toggleInfo('zhang2015mixed','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('zhang2015mixed','bibtex')">BibTeX</a>] [<a href="http://www.sciencedirect.com/science/article/pii/S0031320315000825" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_zhang2015mixed" class="abstract noshow">
+	<td><b>Abstract</b>: Face recognition with multiple views is a challenging research problem. Most of the existing works have focused on extracting shared information among multiple views to improve recognition. However, when the pose variation is too large or missing, ‘shared information’ may not be properly extracted, leading to poor recognition results. In this paper, we propose a novel method for face recognition with multiple view images to overcome the large pose variation and missing pose issue. By introducing a novel mixed norm, the proposed method automatically selects candidates from the gallery to best represent a group of highly correlated face images in a query set to improve classification accuracy. This mixed norm combines the advantages of both sparse representation based classification (SRC) and joint sparse representation based classification (JSRC). A trade off between the L1-norm from SRC and L2,1-norm from JSRC is introduced to achieve this goal. Due to this property, the proposed method decreases the influence when a face image is unseen and has large pose variation in the recognition process. And when some face images with a certain degree of unseen pose variation appear, this mixed norm will find an optimal representation for these query images based on the shared information induced from multiple views. Moreover, we also address an open problem in robust sparse representation and classification which is using L1-norm on the loss function to achieve a robust solution. To solve this formulation, we derive a simple, yet provably convergent algorithm based on the powerful alternative directions method of multipliers (ADMM) framework. We provide extensive comparisons which demonstrate that our method outperforms other state-of-the-arts algorithms on CMU-PIE, Yale B and Multi-PIE databases for multi-view face recognition.</td>
+</tr>
+<tr id="bib_zhang2015mixed" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{zhang2015mixed,
+  author = {Zhang, Xin and Pham, Duc-Son and Venkatesh, Svetha and Liu, Wanquan and Phung, Dinh},
+  title = {Mixed-norm sparse representation for multi view face recognition},
+  journal = {Pattern Recognition},
+  publisher = {Elsevier},
+  year = {2015},
+  volume = {48},
+  number = {9},
+  pages = {2935--2946},
+  url = {http://www.sciencedirect.com/science/article/pii/S0031320315000825}
+}
+</pre></td>
+</tr>
+<tr id="zhang2015multi" class="entry">
+	<td>Zhang X, Phung D, Venkatesh S, Pham D-S and Liu W (2015), <i>"Multi-View Subspace Clustering for Face Images"</i>, In Digital Image Computing: Techniques and Applications (DICTA), 2015 International Conference on. , pp. 1-7.
+	<p class="infolinks">[<a href="javascript:toggleInfo('zhang2015multi','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('zhang2015multi','bibtex')">BibTeX</a>] [<a href="http://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=7371289" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_zhang2015multi" class="abstract noshow">
+	<td><b>Abstract</b>: In many real-world computer vision applications, such as multi-camera surveillance, the objects of interest are captured by visual sensors concurrently, resulting in multi-view data. These views usually provide complementary information to each other. One recent and powerful computer vision method for clustering is sparse subspace clustering (SSC); however, it was not designed for multi-view data, which break down its linear separability assumption. To integrate complementary information between views, multi-view clustering algorithms are required to improve the clustering performance. In this paper, we propose a novel multi-view subspace clustering by searching for an unified latent structure as a global affinity matrix in subspace clustering. Due to the integration of affinity matrices for each view, this global affinity matrix can best represent the relationship between clusters. This could help us achieve better performance on face clustering. We derive a provably convergent algorithm based on the alternating direction method of multipliers (ADMM) framework, which is computationally efficient, to solve the formulation. We demonstrate that this formulation outperforms other alternatives based on state-of-the-arts on challenging multi-view face datasets.</td>
+</tr>
+<tr id="bib_zhang2015multi" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{zhang2015multi,
+  author = {Zhang, Xin and Phung, Dinh and Venkatesh, Svetha and Pham, Duc-Son and Liu, Wanquan},
+  title = {Multi-View Subspace Clustering for Face Images},
+  booktitle = {Digital Image Computing: Techniques and Applications (DICTA), 2015 International Conference on},
+  year = {2015},
+  pages = {1--7},
+  url = {http://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=7371289}
+}
+</pre></td>
+</tr>
+</tbody>
+</table>
+<footer>
+ <small>Created by <a href="http://jabref.sourceforge.net">JabRef</a> on 04/12/2017.</small>
+</footer>
+<!-- file generated by JabRef -->
+</body>
+</html>

@@ -50,6 +50,15 @@
     
     <url>
     
+      <loc>https://svethav.github.io/project/bayesopt/</loc>
+      <lastmod>2016-12-27T00:00:00+00:00</lastmod>
+    </url>
+    
+  
+    
+    
+    <url>
+    
       <loc>https://svethav.github.io/project/early-intervention-for-autism/</loc>
       <lastmod>2016-04-27T00:00:00+00:00</lastmod>
     </url>
@@ -240,6 +249,16 @@
     
     <url>
     
+      <loc>https://svethav.github.io/tags/bayesian/</loc>
+      <lastmod>2016-12-27T00:00:00+00:00</lastmod>
+      <priority>0</priority>
+    </url>
+    
+  
+    
+    
+    <url>
+    
       <loc>https://svethav.github.io/tags/bayesian-learning/</loc>
       <lastmod>2016-04-27T00:00:00+00:00</lastmod>
       <priority>0</priority>
@@ -320,7 +339,7 @@
     <url>
     
       <loc>https://svethav.github.io/project/</loc>
-      <lastmod>2016-04-27T00:00:00+00:00</lastmod>
+      <lastmod>2016-12-27T00:00:00+00:00</lastmod>
       <priority>0</priority>
     </url>
     

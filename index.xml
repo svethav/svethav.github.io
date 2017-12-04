@@ -21,6 +21,27 @@
     </item>
     
     <item>
+      <title>Adaptive Experimental Design using Bayesian Optimisation</title>
+      <link>https://svethav.github.io/project/bayesopt/</link>
+      <pubDate>Tue, 27 Dec 2016 00:00:00 +0000</pubDate>
+      
+      <guid>https://svethav.github.io/project/bayesopt/</guid>
+      <description>&lt;p&gt;This project aims to optimise processes for manufacturing new materials, from short fibres, to alloys, to cosmetics, to food, or, in fact, any material for industry or consumer use. By using machine learning and Bayesian mathematics (a sophisticated form of probability), we have developed an abstract framework and software that achieves a faster, cheaper and more effective approach to optimising products and manufacturing processes.&lt;/p&gt;
+
+&lt;p&gt;The computational challenge in optimisation of novel processes arises because the mathematical relationship between the control variables and the target is often unknown - it is a classic “Black-Box Function”. Experimental data is expensive to acquire, so achieving an optimal setting with a minimum of experiments is desirable. Our framework - Adaptive Experimental Design uses machine learning to navigate complex problems with many variables. It interprets measurements and suggests settings for the next group of experiments, guiding the experimenter to the goal in fewer steps.&lt;/p&gt;
+
+&lt;p&gt;We have applied our method successfully to the following case studies.&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;Short fibre production&lt;/li&gt;
+&lt;li&gt;Alloy manufacturing&lt;/li&gt;
+&lt;li&gt;Alloy heat treatment&lt;/li&gt;
+&lt;li&gt;3D printing&lt;/li&gt;
+&lt;/ul&gt;
+</description>
+    </item>
+    
+    <item>
       <title>Early Intervention for Autism</title>
       <link>https://svethav.github.io/project/early-intervention-for-autism/</link>
       <pubDate>Wed, 27 Apr 2016 00:00:00 +0000</pubDate>
@@ -1230,15 +1251,6 @@ With Jekyll, something that looked like&lt;/p&gt;
       <pubDate>Mon, 01 Jul 2013 00:00:00 +0000</pubDate>
       
       <guid>https://svethav.github.io/publication/toby/</guid>
-      <description></description>
-    </item>
-    
-    <item>
-      <title>Nonnegative shared subspace learning and its application to social media retrieval </title>
-      <link>https://svethav.github.io/publication/nonnegative-shared/</link>
-      <pubDate>Thu, 01 Jul 2010 00:00:00 +0000</pubDate>
-      
-      <guid>https://svethav.github.io/publication/nonnegative-shared/</guid>
       <description></description>
     </item>
     
