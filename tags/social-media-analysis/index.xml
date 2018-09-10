@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Social-media-analysis on Svetha Venkatesh</title>
+    <link>https://svethav.github.io/tags/social-media-analysis/</link>
+    <description>Recent content in Social-media-analysis on Svetha Venkatesh</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <copyright>&amp;copy; 2017 svetha venkatesh</copyright>
+    <lastBuildDate>Wed, 27 Apr 2016 00:00:00 +0000</lastBuildDate>
+    
+	<atom:link href="https://svethav.github.io/tags/social-media-analysis/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+    <item>
+      <title>Social Media Analysis</title>
+      <link>https://svethav.github.io/project/social-media-analysis/</link>
+      <pubDate>Wed, 27 Apr 2016 00:00:00 +0000</pubDate>
+      
+      <guid>https://svethav.github.io/project/social-media-analysis/</guid>
+      <description>We study patterns in social media data; who is talking to who? What are they talking about? What is their sentiment? We discover latent community structures, their topics and trends. We explore not only text in blogs but also connectivity through comments. For personal media management it could be argued that social context contains the set of conceptions most often brought to bear on their contents: Where was this? Who is that?</description>
+    </item>
+    
+  </channel>
+</rss>

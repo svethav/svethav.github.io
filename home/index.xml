@@ -8,7 +8,114 @@
     <language>en-us</language>
     <copyright>&amp;copy; 2017 svetha venkatesh</copyright>
     <lastBuildDate>Sun, 15 Oct 2017 00:00:00 +1100</lastBuildDate>
-    <atom:link href="/home/" rel="self" type="application/rss+xml" />
+    
+	<atom:link href="https://svethav.github.io/home/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+    <item>
+      <title>Academic</title>
+      <link>https://svethav.github.io/post/getting-started/</link>
+      <pubDate>Sun, 15 Oct 2017 00:00:00 +1100</pubDate>
+      
+      <guid>https://svethav.github.io/post/getting-started/</guid>
+      <description></description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>https://svethav.github.io/home/about/</link>
+      <pubDate>Wed, 20 Apr 2016 00:00:00 +0000</pubDate>
+      
+      <guid>https://svethav.github.io/home/about/</guid>
+      <description>Biography Svetha Venkatesh is an ARC Australian Laureate Fellow, Alfred Deakin Professor and Director of Centre for Pattern Recognition and Data Analytics (PRaDA) at Deakin University. She was elected a Fellow of the International Association of Pattern Recognition in 2004 for contributions to formulation and extraction of semantics in multimedia data, and a Fellow of the Australian Academy of Technological Sciences and Engineering in 2006. In 2017, Professor Venkatesh was appointed an Australian Laureate Fellow, the highest individual award the Australian Research Council can bestow.</description>
+    </item>
+    
+    <item>
+      <title>Selected Awards and Honours</title>
+      <link>https://svethav.github.io/home/awards/</link>
+      <pubDate>Wed, 20 Sep 2017 00:00:00 +1000</pubDate>
+      
+      <guid>https://svethav.github.io/home/awards/</guid>
+      <description> 2018: Best Paper Award, Pacific Asia Knowledge Discovery and Data Mining, Melbourne, Australia 2018 Victorian Honour Roll of Women 2017 ARC Australian Laureate Fellowship 2017: PAKDD&amp;rsquo;17: Best Application paper 2016: ACML&amp;rsquo;16:Best Paper RunnerUp 2015: STEM Hero 2014: Best Paper Award, Pacific Asia Knowledge Discovery and Data Mining, Vietnam 2013: Excellence in International Education – Research Engagement , Victorian International Education Awards 2013 &amp;amp; 2012: Smart Technology Award, Geelong Chamber of Commerce - for Toby Playpad and identifying suicidal patients via machine learning 2011: WA Inventor of the Year, iiNet Award - for iCetana 2010: Broadband Innovation Award, Tech23 - for iCetana 2000: Best Paper Award, IEEE Pacific Rim Conference on Multimedia  </description>
+    </item>
+    
+    <item>
+      <title>Fellowship</title>
+      <link>https://svethav.github.io/home/fellowship/</link>
+      <pubDate>Wed, 20 Sep 2017 00:00:00 +1000</pubDate>
+      
+      <guid>https://svethav.github.io/home/fellowship/</guid>
+      <description> 2006 - : Fellow, Australian Academy of Technological Sciences and Engineering (ATSE) 2004 - : Fellow, International Association of Pattern Recognition (IAPR) 1996 - 1997: Fellow, Institute of Advanced Study, Berlin  </description>
+    </item>
+    
+    <item>
+      <title>Research</title>
+      <link>https://svethav.github.io/home/projects/</link>
+      <pubDate>Wed, 20 Apr 2016 00:00:00 +0000</pubDate>
+      
+      <guid>https://svethav.github.io/home/projects/</guid>
+      <description>Our methods are grounded in statistical machine learning and pattern recognition. In our research, we ask the following questions:
+ What are the models that we must construct to be computationally scalable in big-data problems? How do we enhance the expressiveness of such models, what are the representations and can we develop appropriate inference and learning?  </description>
+    </item>
+    
+    <item>
+      <title>Selected Publications</title>
+      <link>https://svethav.github.io/home/publications_selected/</link>
+      <pubDate>Wed, 20 Apr 2016 00:00:00 +1000</pubDate>
+      
+      <guid>https://svethav.github.io/home/publications_selected/</guid>
+      <description></description>
+    </item>
+    
+    <item>
+      <title>Publications</title>
+      <link>https://svethav.github.io/home/publications/</link>
+      <pubDate>Wed, 20 Apr 2016 00:00:00 +1000</pubDate>
+      
+      <guid>https://svethav.github.io/home/publications/</guid>
+      <description>Complete List of publications
+Please refer to the Google Scholar Profile for detailed statistics.
+2018 | 2017 | 2016 | 2015 | 2014 | 2013 | 2012 | 2011 | 2000 | Before 2000</description>
+    </item>
+    
+    <item>
+      <title>Selected Patents</title>
+      <link>https://svethav.github.io/home/patents/</link>
+      <pubDate>Wed, 20 Apr 2016 00:00:00 +0000</pubDate>
+      
+      <guid>https://svethav.github.io/home/patents/</guid>
+      <description> Testing surveillance camera installations (US 8305438, Australia: 2007231552, NZ 571839) Virtual Observer (Australia 2007240116, EP 2005748) Systems and Methods for detecting anomalies from data (US 8744124)  </description>
+    </item>
+    
+    <item>
+      <title>Grants</title>
+      <link>https://svethav.github.io/home/grants/</link>
+      <pubDate>Wed, 20 Apr 2016 00:00:00 +0000</pubDate>
+      
+      <guid>https://svethav.github.io/home/grants/</guid>
+      <description>   Year Title Amount     2018-2022 NHMRC Project Grant - APP1138405 - A RCT of depression prevention in adolescents: the Future Proofing trial (led by Professor Helen Christensen $2,183,737   2017-2018 Translating Deakin&amp;rsquo;s Patient Management Success at Alfred Health (with Dr Wei Luo) $3,016,065   2017-2022 ARC Australian Laureate Fellowship Grant - Pattern Analysis for Accelerating Scientific Innovation $3,016,065   2017-2018 WISE Employment Grant - Unlocking factors for successful job placement through machine learning $50,000   2017-2022 ARC Industrial Transformation Research Hubs grant for Digital Enhanced Living $2,962,655   2017-2020 Advanced manufacturing of new high entropy alloys, AISF Grant $995,000   2016-2019 Telstra Grant- COE in Big Data and Machine Learning $1,600,000   2016-2018 Accuracy of Machine Scoring of Fidgety Movements from High Risk Infant Populations- Cerebral Palsy Alliance $134,409   2015-2017 Stay Well: Analysing lifestyle data from smart monitoring devices, ARC Discovery Project $384,700   2014-2017 Tools for Early Intervention in Autistic Children, ARC Linkage, Partner Autism West Support Incorporated $375,000   2014 Bioinformatics Collaborative Grants Program: Towards a real time data sharing to support patient-centred care, quality health delivery, improvement programmes, performance management and research $210,000   2013 Computational infrastructure for machine learning in computer vision $210,000   2012-2015 Robust and scalable change detection in geo-spatial data: ARC Linkage Partners : Nearmap Pty Ltd; Western Australia Police; City of Armadale $795,000   2011-2013 Assistive technologies for autism support harnessing social media, ARC Linkage Linkage Partner: Autism West $670,000   2011-2013 Computational tools to analyse and exploit the social media revolution, ARC Discovery $290,000   2010 Accelerating Australia’s large-scale video surveillance research programmes, ARC Linkage Infrastructure Equipment and Facilities $280,000   2010-2012 Surviving the data Deluge: Scalable feature extraction, discrimination and analysis for computer vision tasks using compressed sensed data: ARC Discovery $310,000   2008-2011 Collaborative Virtual Observation in Dynamic Environments, NSF Award $336,817   2007-2011 Centre of Excellence- Emedicine (with partners from UWA and LEI) $500,000   2008-2011 Smart technologies for people with vision impairment and blindness, ARC Linkage $483,398   2008-2011 Intelligent Security in Urban Spaces, ARC Linkage $625,000   2007-2009 Taming media for the masses: Computational frameworks for intelligent digital media capture, management and sharing, ARC Discovery $360,000   2005-2008 DTI Funding $210,000   2005-2008 Intelligent Surveillance Systems for the Transport Industry, ARC Linkage $747,000    </description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>https://svethav.github.io/home/talk/</link>
+      <pubDate>Wed, 20 Sep 2017 00:00:00 +1000</pubDate>
+      
+      <guid>https://svethav.github.io/home/talk/</guid>
+      <description>Selected Talks  July 2018: Delivering efficiencies in health care and manufacturing, Indian Institute of Science, Bangalore, India
+ April 2018: Accelerating Experimental Design, Intelligent Polymer Research Institute, University of Wollongong, Australia
+ March 2018: Detecting Rare Events, Collaborative Deans&amp;rsquo; Lecture, Melbourne School of Engineering, Melbourne, Australia
+ Feb 2018: Delivering Efficiencies in Health Care and Manufacturing, The 11th IAPR International Conference on Biometrics (ICB 2018), Gold Coast, Australia</description>
+    </item>
+    
+    <item>
+      <title>Contact</title>
+      <link>https://svethav.github.io/home/contact/</link>
+      <pubDate>Wed, 20 Apr 2016 00:00:00 +0000</pubDate>
+      
+      <guid>https://svethav.github.io/home/contact/</guid>
+      <description></description>
+    </item>
     
   </channel>
 </rss>

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Health on Svetha Venkatesh</title>
+    <link>https://svethav.github.io/tags/health/</link>
+    <description>Recent content in Health on Svetha Venkatesh</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <copyright>&amp;copy; 2017 svetha venkatesh</copyright>
+    <lastBuildDate>Wed, 27 Apr 2016 00:00:00 +0000</lastBuildDate>
+    
+	<atom:link href="https://svethav.github.io/tags/health/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+    <item>
+      <title>Early Intervention for Autism</title>
+      <link>https://svethav.github.io/project/early-intervention-for-autism/</link>
+      <pubDate>Wed, 27 Apr 2016 00:00:00 +0000</pubDate>
+      
+      <guid>https://svethav.github.io/project/early-intervention-for-autism/</guid>
+      <description>There is a growing gap between the number of children with autism requiring early intervention and available therapy. In this project we seek to produce the following outcomes: * Flexible frameworks for stimulus presentation and recording, for early intervention in social and cognitive/visual areas, * Open source infrastructures to leverage content and metadata from social media, constructing foundations for reusable content in early intervention, * Assistive Technologies for finding appropriate information from forums and blogs, focusing on autism, * Early warning systems of mental wellbeing, measuring affect in text-based social media (forums, blogs, etc.</description>
+    </item>
+    
+    <item>
+      <title>Health Analytics</title>
+      <link>https://svethav.github.io/project/health-analytics/</link>
+      <pubDate>Wed, 27 Apr 2016 00:00:00 +0000</pubDate>
+      
+      <guid>https://svethav.github.io/project/health-analytics/</guid>
+      <description>With our partner Barwon Health we are embarking on questions that arise in examination of large, disparate and multimodal hospital data sets. Can we impact and inform the formation of dynamic health intervention and improved safety and care through:
+ Predicting hospital visitation patterns of patients with chronic disease, Detection of sub-populations that have coherent patterns of disease, causal factors, and typical medical responses Identify data driven characteristics of chronic patients to enable personalized care plans Detect indicators that serve as early warning of chronic disease Monitor key factors that deliver value to patients in the areas of care experiences, care coordination and patient safety.</description>
+    </item>
+    
+  </channel>
+</rss>

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Bayesian-learning on Svetha Venkatesh</title>
+    <link>https://svethav.github.io/tags/bayesian-learning/</link>
+    <description>Recent content in Bayesian-learning on Svetha Venkatesh</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <copyright>&amp;copy; 2017 svetha venkatesh</copyright>
+    <lastBuildDate>Wed, 27 Apr 2016 00:00:00 +0000</lastBuildDate>
+    
+	<atom:link href="https://svethav.github.io/tags/bayesian-learning/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+    <item>
+      <title>Early Intervention for Autism</title>
+      <link>https://svethav.github.io/project/early-intervention-for-autism/</link>
+      <pubDate>Wed, 27 Apr 2016 00:00:00 +0000</pubDate>
+      
+      <guid>https://svethav.github.io/project/early-intervention-for-autism/</guid>
+      <description>There is a growing gap between the number of children with autism requiring early intervention and available therapy. In this project we seek to produce the following outcomes: * Flexible frameworks for stimulus presentation and recording, for early intervention in social and cognitive/visual areas, * Open source infrastructures to leverage content and metadata from social media, constructing foundations for reusable content in early intervention, * Assistive Technologies for finding appropriate information from forums and blogs, focusing on autism, * Early warning systems of mental wellbeing, measuring affect in text-based social media (forums, blogs, etc.</description>
+    </item>
+    
+  </channel>
+</rss>

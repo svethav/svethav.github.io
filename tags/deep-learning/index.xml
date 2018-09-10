@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Deep-learning on Svetha Venkatesh</title>
+    <link>https://svethav.github.io/tags/deep-learning/</link>
+    <description>Recent content in Deep-learning on Svetha Venkatesh</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <copyright>&amp;copy; 2017 svetha venkatesh</copyright>
+    <lastBuildDate>Wed, 27 Apr 2016 00:00:00 +0000</lastBuildDate>
+    
+	<atom:link href="https://svethav.github.io/tags/deep-learning/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+    <item>
+      <title>Health Analytics</title>
+      <link>https://svethav.github.io/project/health-analytics/</link>
+      <pubDate>Wed, 27 Apr 2016 00:00:00 +0000</pubDate>
+      
+      <guid>https://svethav.github.io/project/health-analytics/</guid>
+      <description>With our partner Barwon Health we are embarking on questions that arise in examination of large, disparate and multimodal hospital data sets. Can we impact and inform the formation of dynamic health intervention and improved safety and care through:
+ Predicting hospital visitation patterns of patients with chronic disease, Detection of sub-populations that have coherent patterns of disease, causal factors, and typical medical responses Identify data driven characteristics of chronic patients to enable personalized care plans Detect indicators that serve as early warning of chronic disease Monitor key factors that deliver value to patients in the areas of care experiences, care coordination and patient safety.</description>
+    </item>
+    
+    <item>
+      <title>Large Scale Surveillance</title>
+      <link>https://svethav.github.io/project/large-scale-surveillance/</link>
+      <pubDate>Wed, 27 Apr 2016 00:00:00 +0000</pubDate>
+      
+      <guid>https://svethav.github.io/project/large-scale-surveillance/</guid>
+      <description>We are interested in the problems that arise when we examine hundreds of cameras. This big data problem opens up many new questions: Given limited operator capacity, how can select which camera I should look at? How do I select models and parameters for heterogeneous stream data - example, video feeds in varying environmental conditions? How do I evaluate algorithms in big data - training sets may exceeds 2 weeks of video data, and no realistic ground truth can be obtained from operators.</description>
+    </item>
+    
+    <item>
+      <title>Social Media Analysis</title>
+      <link>https://svethav.github.io/project/social-media-analysis/</link>
+      <pubDate>Wed, 27 Apr 2016 00:00:00 +0000</pubDate>
+      
+      <guid>https://svethav.github.io/project/social-media-analysis/</guid>
+      <description>We study patterns in social media data; who is talking to who? What are they talking about? What is their sentiment? We discover latent community structures, their topics and trends. We explore not only text in blogs but also connectivity through comments. For personal media management it could be argued that social context contains the set of conceptions most often brought to bear on their contents: Where was this? Who is that?</description>
+    </item>
+    
+  </channel>
+</rss>

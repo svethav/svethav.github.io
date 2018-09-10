@@ -59,15 +59,15 @@
 &lt;p&gt;Our Contributions: We present a portable platform for pervasive delivery of early intervention therapy using multi-touch interfaces and principled ways to deliver stimuli of increasing complexity and adapt to a child&amp;rsquo;s performance. Our implementation weaves Natural Environment Tasks with iPad tasks, facilitating a learning platform that integrates early intervention in the child&amp;rsquo;s daily life. The system&amp;rsquo;s construction of stimulus complexity relative to task is evaluated by therapists, together with field trials for evaluating both the integrity of the instructional design and goal of stimulus presentation and adjustment relative to performance for learning tasks. We show overwhelmingly positive results across all our stakeholders, children, parents and therapists. Our results have implications for other early learning fields that require principled ways to construct lessons across skills and adjust stimuli relative to performance. See &lt;a href=&#34;http://tobyplaypad.com/&#34; target=&#34;_blank&#34;&gt;Toby Playpad&lt;/a&gt;. The Technology won the 2011 Curtin University Commercialization award.&lt;/p&gt;
 
 
-&lt;div style=&#34;position: relative; padding-bottom: 56.25%; padding-top: 30px; height: 0; overflow: hidden;&#34;&gt;
-  &lt;iframe src=&#34;//www.youtube.com/embed/OGmwE67RnTc&#34; style=&#34;position: absolute; top: 0; left: 0; width: 100%; height: 100%;&#34; allowfullscreen frameborder=&#34;0&#34; title=&#34;YouTube Video&#34;&gt;&lt;/iframe&gt;
- &lt;/div&gt;
+&lt;div style=&#34;position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden;&#34;&gt;
+  &lt;iframe src=&#34;//www.youtube.com/embed/OGmwE67RnTc&#34; style=&#34;position: absolute; top: 0; left: 0; width: 100%; height: 100%; border:0;&#34; allowfullscreen title=&#34;YouTube Video&#34;&gt;&lt;/iframe&gt;
+&lt;/div&gt;
 
 
 
-&lt;div style=&#34;position: relative; padding-bottom: 56.25%; padding-top: 30px; height: 0; overflow: hidden;&#34;&gt;
-  &lt;iframe src=&#34;//www.youtube.com/embed/xubqQ74aPyI&#34; style=&#34;position: absolute; top: 0; left: 0; width: 100%; height: 100%;&#34; allowfullscreen frameborder=&#34;0&#34; title=&#34;YouTube Video&#34;&gt;&lt;/iframe&gt;
- &lt;/div&gt;
+&lt;div style=&#34;position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden;&#34;&gt;
+  &lt;iframe src=&#34;//www.youtube.com/embed/xubqQ74aPyI&#34; style=&#34;position: absolute; top: 0; left: 0; width: 100%; height: 100%; border:0;&#34; allowfullscreen title=&#34;YouTube Video&#34;&gt;&lt;/iframe&gt;
+&lt;/div&gt;
 
 </description>
     </item>
@@ -103,15 +103,15 @@
 &lt;p&gt;Our Contributions: Focusing on issues of large scale surveillance we have developed new techniques to model &amp;ldquo;normal&amp;rdquo; data from static video cameras. This allows us to detect real time &amp;ldquo;abnormal events&amp;rdquo; and thus enable operators to focus on the 1% of events in a video feed. Our algorithms drive the start-up iCetana&amp;rsquo;s innovative anomaly detection software. The software uses ideas from Compressed Sensing to enable simultaneous surveillance of many cameras deployed in diverse settings. A local city council has used our algorithms to detect loitering, anti-social behaviour and traffic violations. For more information see &lt;a href=&#34;https://icetana.com/&#34; target=&#34;_blank&#34;&gt;iCetana&lt;/a&gt;. The technology was: Winner, The Broadband Innovation Award Tech23,2010; Winner, 2011 WA Innovator of the Year.&lt;/p&gt;
 
 
-&lt;div style=&#34;position: relative; padding-bottom: 56.25%; padding-top: 30px; height: 0; overflow: hidden;&#34;&gt;
-  &lt;iframe src=&#34;//www.youtube.com/embed/kYJvDA4gDKY&#34; style=&#34;position: absolute; top: 0; left: 0; width: 100%; height: 100%;&#34; allowfullscreen frameborder=&#34;0&#34; title=&#34;YouTube Video&#34;&gt;&lt;/iframe&gt;
- &lt;/div&gt;
+&lt;div style=&#34;position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden;&#34;&gt;
+  &lt;iframe src=&#34;//www.youtube.com/embed/kYJvDA4gDKY&#34; style=&#34;position: absolute; top: 0; left: 0; width: 100%; height: 100%; border:0;&#34; allowfullscreen title=&#34;YouTube Video&#34;&gt;&lt;/iframe&gt;
+&lt;/div&gt;
 
 
 
-&lt;div style=&#34;position: relative; padding-bottom: 56.25%; padding-top: 30px; height: 0; overflow: hidden;&#34;&gt;
-  &lt;iframe src=&#34;//www.youtube.com/embed/ZJzIGUfZN1M&#34; style=&#34;position: absolute; top: 0; left: 0; width: 100%; height: 100%;&#34; allowfullscreen frameborder=&#34;0&#34; title=&#34;YouTube Video&#34;&gt;&lt;/iframe&gt;
- &lt;/div&gt;
+&lt;div style=&#34;position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden;&#34;&gt;
+  &lt;iframe src=&#34;//www.youtube.com/embed/ZJzIGUfZN1M&#34; style=&#34;position: absolute; top: 0; left: 0; width: 100%; height: 100%; border:0;&#34; allowfullscreen title=&#34;YouTube Video&#34;&gt;&lt;/iframe&gt;
+&lt;/div&gt;
 
 </description>
     </item>
@@ -850,7 +850,7 @@ Strikethrough with ~~two tildes~~.
 [^1]: Footnote example.
 &lt;/code&gt;&lt;/pre&gt;
 
-&lt;p&gt;I have more &lt;sup class=&#34;footnote-ref&#34; id=&#34;fnref:1&#34;&gt;&lt;a rel=&#34;footnote&#34; href=&#34;#fn:1&#34;&gt;1&lt;/a&gt;&lt;/sup&gt; to say.&lt;/p&gt;
+&lt;p&gt;I have more &lt;sup class=&#34;footnote-ref&#34; id=&#34;fnref:1&#34;&gt;&lt;a href=&#34;#fn:1&#34;&gt;1&lt;/a&gt;&lt;/sup&gt; to say.&lt;/p&gt;
 
 &lt;h2 id=&#34;code-highlighting&#34;&gt;Code highlighting&lt;/h2&gt;
 
