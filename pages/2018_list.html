@@ -1,0 +1,863 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<title>JabRef references</title>
+<meta http-equiv="Content-Type" content="text/html; charset=windows-1252">
+<script type="text/javascript">
+<!--
+// QuickSearch script for JabRef HTML export 
+// Version: 3.0
+//
+// Copyright (c) 2006-2011, Mark Schenk
+//
+// This software is distributed under a Creative Commons Attribution 3.0 License
+// http://creativecommons.org/licenses/by/3.0/
+//
+// Features:
+// - intuitive find-as-you-type searching
+//    ~ case insensitive
+//    ~ ignore diacritics (optional)
+//
+// - search with/without Regular Expressions
+// - match BibTeX key
+//
+
+// Search settings
+var searchAbstract = true;	// search in abstract
+var searchReview = true;	// search in review
+
+var noSquiggles = true; 	// ignore diacritics when searching
+var searchRegExp = false; 	// enable RegExp searches
+
+
+if (window.addEventListener) {
+	window.addEventListener("load",initSearch,false); }
+else if (window.attachEvent) {
+	window.attachEvent("onload", initSearch); }
+
+function initSearch() {
+	// check for quick search table and searchfield
+	if (!document.getElementById('qs_table')||!document.getElementById('quicksearch')) { return; }
+
+	// load all the rows and sort into arrays
+	loadTableData();
+	
+	//find the query field
+	qsfield = document.getElementById('qs_field');
+
+	// previous search term; used for speed optimisation
+	prevSearch = '';
+
+	//find statistics location
+	stats = document.getElementById('stat');
+	setStatistics(-1);
+	
+	// set up preferences
+	initPreferences();
+
+	// shows the searchfield
+	document.getElementById('quicksearch').style.display = 'block';
+	document.getElementById('qs_field').onkeyup = quickSearch;
+}
+
+function loadTableData() {
+	// find table and appropriate rows
+	searchTable = document.getElementById('qs_table');
+	var allRows = searchTable.getElementsByTagName('tbody')[0].getElementsByTagName('tr');
+
+	// split all rows into entryRows and infoRows (e.g. abstract, review, bibtex)
+	entryRows = new Array(); infoRows = new Array(); absRows = new Array(); revRows = new Array();
+
+	// get data from each row
+	entryRowsData = new Array(); absRowsData = new Array(); revRowsData = new Array(); 
+	
+	BibTeXKeys = new Array();
+	
+	for (var i=0, k=0, j=0; i<allRows.length;i++) {
+		if (allRows[i].className.match(/entry/)) {
+			entryRows[j] = allRows[i];
+			entryRowsData[j] = stripDiacritics(getTextContent(allRows[i]));
+			allRows[i].id ? BibTeXKeys[j] = allRows[i].id : allRows[i].id = 'autokey_'+j;
+			j ++;
+		} else {
+			infoRows[k++] = allRows[i];
+			// check for abstract/review
+			if (allRows[i].className.match(/abstract/)) {
+				absRows.push(allRows[i]);
+				absRowsData[j-1] = stripDiacritics(getTextContent(allRows[i]));
+			} else if (allRows[i].className.match(/review/)) {
+				revRows.push(allRows[i]);
+				revRowsData[j-1] = stripDiacritics(getTextContent(allRows[i]));
+			}
+		}
+	}
+	//number of entries and rows
+	numEntries = entryRows.length;
+	numInfo = infoRows.length;
+	numAbs = absRows.length;
+	numRev = revRows.length;
+}
+
+function quickSearch(){
+	
+	tInput = qsfield;
+
+	if (tInput.value.length == 0) {
+		showAll();
+		setStatistics(-1);
+		qsfield.className = '';
+		return;
+	} else {
+		t = stripDiacritics(tInput.value);
+
+		if(!searchRegExp) { t = escapeRegExp(t); }
+			
+		// only search for valid RegExp
+		try {
+			textRegExp = new RegExp(t,"i");
+			closeAllInfo();
+			qsfield.className = '';
+		}
+			catch(err) {
+			prevSearch = tInput.value;
+			qsfield.className = 'invalidsearch';
+			return;
+		}
+	}
+	
+	// count number of hits
+	var hits = 0;
+
+	// start looping through all entry rows
+	for (var i = 0; cRow = entryRows[i]; i++){
+
+		// only show search the cells if it isn't already hidden OR if the search term is getting shorter, then search all
+		if(cRow.className.indexOf('noshow')==-1 || tInput.value.length <= prevSearch.length){
+			var found = false; 
+
+			if (entryRowsData[i].search(textRegExp) != -1 || BibTeXKeys[i].search(textRegExp) != -1){ 
+				found = true;
+			} else {
+				if(searchAbstract && absRowsData[i]!=undefined) {
+					if (absRowsData[i].search(textRegExp) != -1){ found=true; } 
+				}
+				if(searchReview && revRowsData[i]!=undefined) {
+					if (revRowsData[i].search(textRegExp) != -1){ found=true; } 
+				}
+			}
+			
+			if (found){
+				cRow.className = 'entry show';
+				hits++;
+			} else {
+				cRow.className = 'entry noshow';
+			}
+		}
+	}
+
+	// update statistics
+	setStatistics(hits)
+	
+	// set previous search value
+	prevSearch = tInput.value;
+}
+
+
+// Strip Diacritics from text
+// http://stackoverflow.com/questions/990904/javascript-remove-accents-in-strings
+
+// String containing replacement characters for stripping accents 
+var stripstring = 
+    'AAAAAAACEEEEIIII'+
+    'DNOOOOO.OUUUUY..'+
+    'aaaaaaaceeeeiiii'+
+    'dnooooo.ouuuuy.y'+
+    'AaAaAaCcCcCcCcDd'+
+    'DdEeEeEeEeEeGgGg'+
+    'GgGgHhHhIiIiIiIi'+
+    'IiIiJjKkkLlLlLlL'+
+    'lJlNnNnNnnNnOoOo'+
+    'OoOoRrRrRrSsSsSs'+
+    'SsTtTtTtUuUuUuUu'+
+    'UuUuWwYyYZzZzZz.';
+
+function stripDiacritics(str){
+
+    if(noSquiggles==false){
+        return str;
+    }
+
+    var answer='';
+    for(var i=0;i<str.length;i++){
+        var ch=str[i];
+        var chindex=ch.charCodeAt(0)-192;   // Index of character code in the strip string
+        if(chindex>=0 && chindex<stripstring.length){
+            // Character is within our table, so we can strip the accent...
+            var outch=stripstring.charAt(chindex);
+            // ...unless it was shown as a '.'
+            if(outch!='.')ch=outch;
+        }
+        answer+=ch;
+    }
+    return answer;
+}
+
+// http://stackoverflow.com/questions/3446170/escape-string-for-use-in-javascript-regex
+// NOTE: must escape every \ in the export code because of the JabRef Export...
+function escapeRegExp(str) {
+  return str.replace(/[-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, "\\$&");
+}
+
+function toggleInfo(articleid,info) {
+
+	var entry = document.getElementById(articleid);
+	var abs = document.getElementById('abs_'+articleid);
+	var rev = document.getElementById('rev_'+articleid);
+	var bib = document.getElementById('bib_'+articleid);
+	
+	if (abs && info == 'abstract') {
+		abs.className.indexOf('noshow') == -1?abs.className = 'abstract noshow':abs.className = 'abstract show';
+	} else if (rev && info == 'review') {
+		rev.className.indexOf('noshow') == -1?rev.className = 'review noshow':rev.className = 'review show';
+	} else if (bib && info == 'bibtex') {
+		bib.className.indexOf('noshow') == -1?bib.className = 'bibtex noshow':bib.className = 'bibtex show';
+	} else { 
+		return;
+	}
+
+	// check if one or the other is available
+	var revshow; var absshow; var bibshow;
+	(abs && abs.className.indexOf('noshow') == -1)? absshow = true: absshow = false;
+	(rev && rev.className.indexOf('noshow') == -1)? revshow = true: revshow = false;	
+	(bib && bib.className.indexOf('noshow') == -1)? bibshow = true: bibshow = false;
+	
+	// highlight original entry
+	if(entry) {
+		if (revshow || absshow || bibshow) {
+		entry.className = 'entry highlight show';
+		} else {
+		entry.className = 'entry show';
+		}
+	}
+	
+	// When there's a combination of abstract/review/bibtex showing, need to add class for correct styling
+	if(absshow) {
+		(revshow||bibshow)?abs.className = 'abstract nextshow':abs.className = 'abstract';
+	} 
+	if (revshow) {
+		bibshow?rev.className = 'review nextshow': rev.className = 'review';
+	}	
+	
+}
+
+function setStatistics (hits) {
+	if(hits < 0) { hits=numEntries; }
+	if(stats) { stats.firstChild.data = hits + '/' + numEntries}
+}
+
+function getTextContent(node) {
+	// Function written by Arve Bersvendsen
+	// http://www.virtuelvis.com
+	
+	if (node.nodeType == 3) {
+	return node.nodeValue;
+	} // text node
+	if (node.nodeType == 1 && node.className != "infolinks") { // element node
+	var text = [];
+	for (var chld = node.firstChild;chld;chld=chld.nextSibling) {
+		text.push(getTextContent(chld));
+	}
+	return text.join("");
+	} return ""; // some other node, won't contain text nodes.
+}
+
+function showAll(){
+	closeAllInfo();
+	for (var i = 0; i < numEntries; i++){ entryRows[i].className = 'entry show'; }
+}
+
+function closeAllInfo(){
+	for (var i=0; i < numInfo; i++){
+		if (infoRows[i].className.indexOf('noshow') ==-1) {
+			infoRows[i].className = infoRows[i].className + ' noshow';
+		}
+	}
+}
+
+function clearQS() {
+	qsfield.value = '';
+	showAll();
+}
+
+function redoQS(){
+	showAll();
+	quickSearch(qsfield);
+}
+
+function updateSetting(obj){
+	var option = obj.id;
+	var checked = obj.value;
+
+	switch(option)
+	 {
+	 case "opt_searchAbs":
+	   searchAbstract=!searchAbstract;
+	   redoQS();
+	   break;
+	 case "opt_searchRev":
+	   searchReview=!searchReview;
+	   redoQS();
+	   break;
+	 case "opt_useRegExp":
+	   searchRegExp=!searchRegExp;
+	   redoQS();
+	   break;
+	 case "opt_noAccents":
+	   noSquiggles=!noSquiggles;
+	   loadTableData();
+	   redoQS();
+	   break;
+	 }
+}
+
+function initPreferences(){
+	if(searchAbstract){document.getElementById("opt_searchAbs").checked = true;}
+	if(searchReview){document.getElementById("opt_searchRev").checked = true;}
+	if(noSquiggles){document.getElementById("opt_noAccents").checked = true;}
+	if(searchRegExp){document.getElementById("opt_useRegExp").checked = true;}
+	
+	if(numAbs==0) {document.getElementById("opt_searchAbs").parentNode.style.display = 'none';}
+	if(numRev==0) {document.getElementById("opt_searchRev").parentNode.style.display = 'none';}	
+}
+
+function toggleSettings(){
+	var togglebutton = document.getElementById('showsettings');
+	var settings = document.getElementById('settings');
+	
+	if(settings.className == "hidden"){
+		settings.className = "show";
+		togglebutton.innerText = "close settings";
+		togglebutton.textContent = "close settings";
+	}else{
+		settings.className = "hidden";
+		togglebutton.innerText = "settings...";		
+		togglebutton.textContent = "settings...";
+	}
+}
+
+-->
+</script>
+<style type="text/css">
+body { background-color: white; font-family: Arial, sans-serif; font-size: 13px; line-height: 1.2; padding: 1em; color: #2E2E2E; width: 50em; margin: auto auto; }
+
+form#quicksearch { width: auto; border-style: solid; border-color: gray; border-width: 1px 0px; padding: 0.7em 0.5em; display:none; position:relative; }
+span#searchstat {padding-left: 1em;}
+
+div#settings { margin-top:0.7em; /* border-bottom: 1px transparent solid; background-color: #efefef; border: 1px grey solid; */ }
+div#settings ul {margin: 0; padding: 0; }
+div#settings li {margin: 0; padding: 0 1em 0 0; display: inline; list-style: none; }
+div#settings li + li { border-left: 2px #efefef solid; padding-left: 0.5em;}
+div#settings input { margin-bottom: 0px;}
+
+div#settings.hidden {display:none;}
+
+#showsettings { border: 1px grey solid; padding: 0 0.5em; float:right; line-height: 1.6em; text-align: right; }
+#showsettings:hover { cursor: pointer; }
+
+.invalidsearch { background-color: red; }
+input[type="button"] { background-color: #efefef; border: 1px #2E2E2E solid;}
+
+table { border: 1px gray none; width: 100%; empty-cells: show; border-spacing: 0em 0.1em; margin: 1em 0em; }
+th, td { border: none; padding: 0.5em; vertical-align: top; text-align: justify; }
+
+td a { color: navy; text-decoration: none; }
+td a:hover  { text-decoration: underline; }
+
+tr.noshow { display: none;}
+tr.highlight td { background-color: #EFEFEF; border-top: 2px #2E2E2E solid; font-weight: bold; }
+tr.abstract td, tr.review td, tr.bibtex td { background-color: #EFEFEF; text-align: justify; border-bottom: 2px #2E2E2E solid; }
+tr.nextshow td { border-bottom-style: none; }
+
+tr.bibtex pre { width: 100%; overflow: auto; white-space: pre-wrap;}
+p.infolinks { margin: 0.3em 0em 0em 0em; padding: 0px; }
+
+@media print {
+	p.infolinks, #qs_settings, #quicksearch, t.bibtex { display: none !important; }
+	tr { page-break-inside: avoid; }
+}
+</style>
+</head>
+<body>
+
+<form action="" id="quicksearch">
+<input type="text" id="qs_field" autocomplete="off" placeholder="Type to search..." /> <input type="button" onclick="clearQS()" value="clear" />
+<span id="searchstat">Matching entries: <span id="stat">0</span></span>
+<div id="showsettings" onclick="toggleSettings()">settings...</div>
+<div id="settings" class="hidden">
+<ul>
+<li><input type="checkbox" class="search_setting" id="opt_searchAbs" onchange="updateSetting(this)"><label for="opt_searchAbs"> include abstract</label></li>
+<li><input type="checkbox" class="search_setting" id="opt_searchRev" onchange="updateSetting(this)"><label for="opt_searchRev"> include review</label></li>
+<li><input type="checkbox" class="search_setting" id="opt_useRegExp" onchange="updateSetting(this)"><label for="opt_useRegExp"> use RegExp</label></li>
+<li><input type="checkbox" class="search_setting" id="opt_noAccents" onchange="updateSetting(this)"><label for="opt_noAccents"> ignore accents</label></li>
+</ul>
+</div>
+</form>
+<table id="qs_table" border="1">
+<tbody>
+<tr id="DBLP:conf/nips/GopakumarGR0V18" class="entry">
+	<td>Gopakumar S, Gupta S, Rana S, Nguyen V and Venkatesh S (2018), <i>"Algorithmic Assurance: An Active Approach to Algorithmic Testing using Bayesian Optimisation"</i>, In Advances in Neural Information Processing Systems 31: Annual Conference on Neural Information Processing Systems 2018, NeurIPS 2018, 3-8 December 2018, Montr&eacute;al, Canada.. , pp. 5470-5478.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('DBLP:conf/nips/GopakumarGR0V18','bibtex')">BibTeX</a>] [<a href="http://papers.nips.cc/paper/7791-algorithmic-assurance-an-active-approach-to-algorithmic-testing-using-bayesian-optimisation" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="bib_DBLP:conf/nips/GopakumarGR0V18" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{DBLP:conf/nips/GopakumarGR0V18,
+  author = {Shivapratap Gopakumar and Sunil Gupta and Santu Rana and Vu Nguyen and Svetha Venkatesh},
+  title = {Algorithmic Assurance: An Active Approach to Algorithmic Testing using Bayesian Optimisation},
+  booktitle = {Advances in Neural Information Processing Systems 31: Annual Conference on Neural Information Processing Systems 2018, NeurIPS 2018, 3-8 December 2018, Montr&eacute;al, Canada.},
+  year = {2018},
+  pages = {5470--5478},
+  url = {http://papers.nips.cc/paper/7791-algorithmic-assurance-an-active-approach-to-algorithmic-testing-using-bayesian-optimisation}
+}
+</pre></td>
+</tr>
+<tr id="DBLP:conf/nips/Le0NV18" class="entry">
+	<td>Le H, Tran T, Nguyen T and Venkatesh S (2018), <i>"Variational Memory Encoder-Decoder"</i>, In Advances in Neural Information Processing Systems 31: Annual Conference on Neural Information Processing Systems 2018, NeurIPS 2018, 3-8 December 2018, Montreal, Canada.. , pp. 1515-1525.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('DBLP:conf/nips/Le0NV18','bibtex')">BibTeX</a>] [<a href="http://papers.nips.cc/paper/7424-variational-memory-encoder-decoder" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="bib_DBLP:conf/nips/Le0NV18" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{DBLP:conf/nips/Le0NV18,
+  author = {Hung Le and Truyen Tran and Thin Nguyen and Svetha Venkatesh},
+  title = {Variational Memory Encoder-Decoder},
+  booktitle = {Advances in Neural Information Processing Systems 31: Annual Conference on Neural Information Processing Systems 2018, NeurIPS 2018, 3-8 December 2018, Montreal, Canada.},
+  year = {2018},
+  pages = {1515--1525},
+  url = {http://papers.nips.cc/paper/7424-variational-memory-encoder-decoder}
+}
+</pre></td>
+</tr>
+<tr id="AnilPRICAI_2018" class="entry">
+	<td>Ramachandran A, Gupta S, Santu R and Venkatesh S (2018), <i>"Selecting optimal source for transfer learning in bayesian optimisation"</i>, In The 15th Pacific Rim International Conference on Artificial Intelligence. ((To Appear. Accepted on 31 May 2018))
+	<p class="infolinks"> [<a href="javascript:toggleInfo('AnilPRICAI_2018','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_AnilPRICAI_2018" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{AnilPRICAI_2018,
+  author = {Ramachandran, A. and Gupta, S.K. and Santu, R. and Venkatesh, S.},
+  title = {Selecting optimal source for transfer learning in bayesian optimisation},
+  booktitle = {The 15th Pacific Rim International Conference on Artificial Intelligence},
+  year = {2018},
+  number = {(To Appear. Accepted on 31 May 2018)}
+}
+</pre></td>
+</tr>
+<tr id="do2018ICPR" class="entry">
+	<td>Kien D, Truyen T and Venkatesh S (2018), <i>"Knowledge Graph Embedding with Multiple Relation Projections"</i>, In International Conference on Pattern Recognition (ICPR). ((To Appear. Accepted on 21 Apr 2018))
+	<p class="infolinks"> [<a href="javascript:toggleInfo('do2018ICPR','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_do2018ICPR" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{do2018ICPR,
+  author = {Kien, Do and Truyen, Tran and Venkatesh, Svetha},
+  title = {Knowledge Graph Embedding with Multiple Relation Projections},
+  booktitle = {International Conference on Pattern Recognition (ICPR)},
+  year = {2018},
+  number = {(To Appear. Accepted on 21 Apr 2018)}
+}
+</pre></td>
+</tr>
+<tr id="gupta2018exploiting" class="entry">
+	<td>Gupta S, Shilton A, Rana S and Venkatesh S (2018), <i>"Exploiting Strategy-Space Diversity for Batch Bayesian Optimization"</i>, In The 21st International Conference on Artificial Intelligence and Statistics. Lanzarote, Canary Islands, 2018. , pp. 538-547.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('gupta2018exploiting','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_gupta2018exploiting" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{gupta2018exploiting,
+  author = {Gupta, S. and Shilton, A. and Rana, S. and Venkatesh, S.},
+  title = {Exploiting Strategy-Space Diversity for Batch Bayesian Optimization},
+  booktitle = {The 21st International Conference on Artificial Intelligence and Statistics. Lanzarote, Canary Islands, 2018},
+  year = {2018},
+  pages = {538--547}
+}
+</pre></td>
+</tr>
+<tr id="harikumar2018differentially" class="entry">
+	<td>Harikumar H, Rana S, Gupta S, Nguyen T, Kaimal R and Venkatesh S (2018), <i>"Differentially Private Prescriptive Analytics"</i>, In 2018 IEEE International Conference on Data Mining (ICDM). , pp. 995-1000.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('harikumar2018differentially','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_harikumar2018differentially" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{harikumar2018differentially,
+  author = {Harikumar, Haripriya and Rana, Santu and Gupta, Sunil and Nguyen, Thin and Kaimal, Ramachandra and Venkatesh, Svetha},
+  title = {Differentially Private Prescriptive Analytics},
+  booktitle = {2018 IEEE International Conference on Data Mining (ICDM)},
+  year = {2018},
+  pages = {995--1000}
+}
+</pre></td>
+</tr>
+<tr id="harikumar2018PAKDD" class="entry">
+	<td>Harikumar H, Rana S, Gupta S, Nguyen T, Kaimal R and Venkatesh S (2018), <i>"Prescriptive Analytics through Constrained Bayesian Optimization"</i>, In Pacific-Asia Conference on Knowledge Discovery and Data Mining. 
+	<p class="infolinks"> [<a href="javascript:toggleInfo('harikumar2018PAKDD','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_harikumar2018PAKDD" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{harikumar2018PAKDD,
+  author = {Harikumar, H. and Rana, S. and Gupta, S. and Nguyen, T. and Kaimal, R. and Venkatesh, Svetha},
+  title = {Prescriptive Analytics through Constrained Bayesian Optimization},
+  booktitle = {Pacific-Asia Conference on Knowledge Discovery and Data Mining},
+  year = {2018}
+}
+</pre></td>
+</tr>
+<tr id="HungKDD2018" class="entry">
+	<td>Le H, Tran T and Venkatesh S (2018), <i>"Dual Memory Neural Computer for Asynchronous Two-view Sequential Learning"</i>, In The 24th ACM SIGKDD International Conference on Knowledge Discovery and Data Mining (KDD). ((To Appear. Accepted on 22 May 2018))
+	<p class="infolinks"> [<a href="javascript:toggleInfo('HungKDD2018','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_HungKDD2018" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{HungKDD2018,
+  author = {Le, Hung and Tran, Truyen and Venkatesh, Svetha},
+  title = {Dual Memory Neural Computer for Asynchronous Two-view Sequential Learning},
+  booktitle = {The 24th ACM SIGKDD International Conference on Knowledge Discovery and Data Mining (KDD)},
+  year = {2018},
+  number = {(To Appear. Accepted on 22 May 2018)}
+}
+</pre></td>
+</tr>
+<tr id="le2018PAKDD" class="entry">
+	<td>Le H, Tran T and Venkatesh S (2018), <i>"Dual control memory augmented neural networks for treatment recommendations"</i>, In Pacific-Asia Conference on Knowledge Discovery and Data Mining (PAKDD). 
+	<p class="infolinks"> [<a href="javascript:toggleInfo('le2018PAKDD','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_le2018PAKDD" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{le2018PAKDD,
+  author = {Le, Hung and Tran, Truyen and Venkatesh, Svetha},
+  title = {Dual control memory augmented neural networks for treatment recommendations},
+  booktitle = {Pacific-Asia Conference on Knowledge Discovery and Data Mining (PAKDD)},
+  year = {2018}
+}
+</pre></td>
+</tr>
+<tr id="LeonPRICAI_2018" class="entry">
+	<td>Yang A, Li C, Rana S, Gupta S and Venkatesh S (2018), <i>"Efficient Bayesian Optimisation Using Derivative Meta-Model"</i>, In The 15th Pacific Rim International Conference on Artificial Intelligence. ((To Appear. Accepted on 31 May 2018))
+	<p class="infolinks"> [<a href="javascript:toggleInfo('LeonPRICAI_2018','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_LeonPRICAI_2018" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{LeonPRICAI_2018,
+  author = {Yang, A. and Li, C. and Rana, S. and Gupta, S. and Venkatesh, S.},
+  title = {Efficient Bayesian Optimisation Using Derivative Meta-Model},
+  booktitle = {The 15th Pacific Rim International Conference on Artificial Intelligence},
+  year = {2018},
+  number = {(To Appear. Accepted on 31 May 2018)}
+}
+</pre></td>
+</tr>
+<tr id="li2018accelerating" class="entry">
+	<td>Li C, Santu R, Gupta S, Nguyen V, Venkatesh S, Sutti A, Leal DRDC, Slezak T, Height M, Mohammed M and others (2018), <i>"Accelerating Experimental Design by Incorporating Experimenter Hunches"</i>, In 2018 IEEE International Conference on Data Mining (ICDM). , pp. 257-266.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('li2018accelerating','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_li2018accelerating" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{li2018accelerating,
+  author = {Li, Cheng and Santu, Rana and Gupta, Sunil and Nguyen, Vu and Venkatesh, Svetha and Sutti, Alessandra and Leal, David Rubin De Celis and Slezak, Teo and Height, Murray and Mohammed, Mazher and others},
+  title = {Accelerating Experimental Design by Incorporating Experimenter Hunches},
+  booktitle = {2018 IEEE International Conference on Data Mining (ICDM)},
+  year = {2018},
+  pages = {257--266}
+}
+</pre></td>
+</tr>
+<tr id="majid2018ICPR" class="entry">
+	<td>Abdolshah M, Shilton A, Rana S, Gupta S and Venkatesh S (2018), <i>"Expected Hypervolume Improvement with Constraints"</i>, In International Conference on Pattern Recognition (ICPR). ((To Appear. Accepted on 21 Apr 2018))
+	<p class="infolinks"> [<a href="javascript:toggleInfo('majid2018ICPR','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_majid2018ICPR" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{majid2018ICPR,
+  author = {Abdolshah, Majid and Shilton, Alistair and Rana, Santu and Gupta, Sunil and Venkatesh, Svetha},
+  title = {Expected Hypervolume Improvement with Constraints},
+  booktitle = {International Conference on Pattern Recognition (ICPR)},
+  year = {2018},
+  number = {(To Appear. Accepted on 21 Apr 2018)}
+}
+</pre></td>
+</tr>
+<tr id="mguyen2018PAKDD" class="entry">
+	<td>Nguyen D, Nguyen TD, Luo W and Venkatesh S (2018), <i>"Trans2Vec: Learning Transaction Embedding via Items and Frequent Itemsets"</i>, In Pacific-Asia Conference on Knowledge Discovery and Data Mining. 
+	<p class="infolinks"> [<a href="javascript:toggleInfo('mguyen2018PAKDD','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_mguyen2018PAKDD" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{mguyen2018PAKDD,
+  author = {Nguyen, Dang and Nguyen, Tu Dinh and Luo, Wei and Venkatesh, Svetha.},
+  title = {Trans2Vec: Learning Transaction Embedding via Items and Frequent Itemsets},
+  booktitle = {Pacific-Asia Conference on Knowledge Discovery and Data Mining},
+  year = {2018}
+}
+</pre></td>
+</tr>
+<tr id="nguyen2018effective" class="entry">
+	<td>Nguyen D, Luo W, Venkatesh S and Phung D (2018), <i>"Effective Identification of Similar Patients Through Sequential Matching over ICD Code Embedding"</i>, Journal of Medical Systems.  Vol. 42(5), pp. 94. Springer.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('nguyen2018effective','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_nguyen2018effective" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{nguyen2018effective,
+  author = {Nguyen, Dang and Luo, Wei and Venkatesh, Svetha and Phung, Dinh},
+  title = {Effective Identification of Similar Patients Through Sequential Matching over ICD Code Embedding},
+  journal = {Journal of Medical Systems},
+  publisher = {Springer},
+  year = {2018},
+  volume = {42},
+  number = {5},
+  pages = {94}
+}
+</pre></td>
+</tr>
+<tr id="nguyen2018filtering" class="entry">
+	<td>Nguyen V, Gupta S, Rana S, Li C and Venkatesh S (2018), <i>"Filtering Bayesian optimization approach in weakly specified search space"</i>, Knowledge and Information Systems. , pp. 1-29. Springer.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('nguyen2018filtering','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_nguyen2018filtering" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{nguyen2018filtering,
+  author = {Nguyen, Vu and Gupta, Sunil and Rana, Santu and Li, Cheng and Venkatesh, Svetha},
+  title = {Filtering Bayesian optimization approach in weakly specified search space},
+  journal = {Knowledge and Information Systems},
+  publisher = {Springer},
+  year = {2018},
+  pages = {1--29}
+}
+</pre></td>
+</tr>
+<tr id="nguyen2018ltarm" class="entry">
+	<td>Nguyen D, Luo W, Phung D and Venkatesh S (2018), <i>"LTARM: A novel temporal association rule mining method to understand toxicities in a routine cancer treatment"</i>, Knowledge-Based Systems.  Vol. 161, pp. 313-328. Elsevier.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('nguyen2018ltarm','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_nguyen2018ltarm" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{nguyen2018ltarm,
+  author = {Nguyen, Dang and Luo, Wei and Phung, Dinh and Venkatesh, Svetha},
+  title = {LTARM: A novel temporal association rule mining method to understand toxicities in a routine cancer treatment},
+  journal = {Knowledge-Based Systems},
+  publisher = {Elsevier},
+  year = {2018},
+  volume = {161},
+  pages = {313--328}
+}
+</pre></td>
+</tr>
+<tr id="nguyen2018PAKDD" class="entry">
+	<td>Nguyen DT, Gupta S, Rana S and Venkatesh S (2018), <i>"A Privacy Preserving Bayesian Optimization with High Efficiency"</i>, In Pacific-Asia Conference on Knowledge Discovery and Data Mining. 
+	<p class="infolinks"> [<a href="javascript:toggleInfo('nguyen2018PAKDD','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_nguyen2018PAKDD" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{nguyen2018PAKDD,
+  author = {Nguyen, Dai T. and Gupta, S. and Rana, Santu and Venkatesh, Svetha},
+  title = {A Privacy Preserving Bayesian Optimization with High Efficiency},
+  booktitle = {Pacific-Asia Conference on Knowledge Discovery and Data Mining},
+  year = {2018}
+}
+</pre></td>
+</tr>
+<tr id="nguyen2018SDM" class="entry">
+	<td>Nguyen D, Luo W, Nguyen T, Venkatesh S and Phung D (2018), <i>"Learning Graph Representation via Frequent Subgraphs"</i>, In Proceedings of the 2018 SIAM International Conference on Data Mining (SDM). , pp. 306-314.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('nguyen2018SDM','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_nguyen2018SDM" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{nguyen2018SDM,
+  author = {Nguyen, Dang and Luo, Wei and Nguyen, Tu and Venkatesh, Svetha and Phung, Dinh},
+  title = {Learning Graph Representation via Frequent Subgraphs},
+  booktitle = {Proceedings of the 2018 SIAM International Conference on Data Mining (SDM)},
+  year = {2018},
+  pages = {306-314}
+}
+</pre></td>
+</tr>
+<tr id="nguyen2018using" class="entry">
+	<td>Nguyen T, Larsen M, O'Dea B, Nguyen H, Nguyen DT, Yearwood J, Phung D, Venkatesh S and Christensen H (2018), <i>"Using spatiotemporal distribution of geocoded Twitter data to predict US county-level health indices"</i>, Future Generation Computer Systems.  Elsevier.
+	<p class="infolinks">[<a href="javascript:toggleInfo('nguyen2018using','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('nguyen2018using','bibtex')">BibTeX</a>] [<a href="https://www.sciencedirect.com/science/article/pii/S0167739X17312487" target="_blank">URL</a>]</p>
+	</td>
+</tr>
+<tr id="abs_nguyen2018using" class="abstract noshow">
+	<td><b>Abstract</b>: For more than three decades, the US has annually conducted Behavioral Risk Factor Surveillance System (BRFSS) surveys to capture health behavior and health status of its people. Though this kind of information at population level is important for local governments to identify local needs, traditional datasets take several years to collate and to become publicly available. Geocoded social media data can provide an alternative reflection of local health trends. Due to the large scale of data, such as approximately two billions of tweets in this work, aggregating the tweets at a population level is common practice. While alleviating the computational cost, the aggregation operation would result in the loss of information on the distribution of data over the population, and such information may be important for identifying the health behavior and health outcomes of the population. In this work, we propose statistical features constructed on-top of primary features to predict county-level health indices. The primary features include topics and linguistic patterns extracted from tweets with county-decoded information. In addition, tweeting behaviors, particularly tweeting time, are used as a predictor of the health indices. Apache Spark, an advanced cluster computing paradigm, was employed to efficiently process the large corpus of tweets, including geo-decoding the geotags, extracting low-level (primary) features, and computing the statistical features. The results show strong correlations between publicly available health indices and the features extracted from geospatially coded Twitter data. Statistical features gained higher correlation coefficients than did the aggregation ones, suggesting the potential and applicability of the proposed features in a wide spectrum of applications on data analytics at population levels. In addition, the prediction performance was also improved when the temporal information was employed. This demonstrates that the real-time analysis of social media data can provide timely insights into the health of populations.</td>
+</tr>
+<tr id="bib_nguyen2018using" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{nguyen2018using,
+  author = {Nguyen, Thin and Larsen, Mark and O'Dea, Bridianne and Nguyen, Hung and Nguyen, Duc Thanh and Yearwood, John and Phung, Dinh and Venkatesh, Svetha and Christensen, Helen},
+  title = {Using spatiotemporal distribution of geocoded Twitter data to predict US county-level health indices},
+  journal = {Future Generation Computer Systems},
+  publisher = {Elsevier},
+  year = {2018},
+  url = {https://www.sciencedirect.com/science/article/pii/S0167739X17312487}
+}
+</pre></td>
+</tr>
+<tr id="PhuocIJCNN2018" class="entry">
+	<td>Nguyen P, Tran T and Venkatesh S (2018), <i>"Resset: A Recurrent Model for Sequence of Sets with Applications to Electronic Medical Records"</i>, In The 2018 international joint conference on Neural Networks (IJCNN).  Vol. (To Appear. Accepted on 16 Mar 2018)
+	<p class="infolinks"> [<a href="javascript:toggleInfo('PhuocIJCNN2018','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_PhuocIJCNN2018" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{PhuocIJCNN2018,
+  author = {Nguyen, Phuoc and Tran, Truyen and Venkatesh, Svetha},
+  title = {Resset: A Recurrent Model for Sequence of Sets with Applications to Electronic Medical Records},
+  booktitle = {The 2018 international joint conference on Neural Networks (IJCNN)},
+  year = {2018},
+  volume = {(To Appear. Accepted on 16 Mar 2018)}
+}
+</pre></td>
+</tr>
+<tr id="ShiltonUAI2018" class="entry">
+	<td>Shilton A, Rana S, Gupta S and Venkatesh S (2018), <i>"Multi-Target Optimisation via Bayesian Optimisation and Linear Programming"</i>, In Proceedings of UAI2018: Conference on Uncertainty in Artificial Intelligence. Monterey, California, August, 2018. 
+	<p class="infolinks"> [<a href="javascript:toggleInfo('ShiltonUAI2018','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_ShiltonUAI2018" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{ShiltonUAI2018,
+  author = {Shilton, Alistair and Rana, Santu and Gupta, Sunil and Venkatesh, Svetha},
+  title = {Multi-Target Optimisation via Bayesian Optimisation and Linear Programming},
+  booktitle = {Proceedings of UAI2018: Conference on Uncertainty in Artificial Intelligence},
+  year = {2018}
+}
+</pre></td>
+</tr>
+<tr id="trang2018ICPR" class="entry">
+	<td>Pham T, Tran T and Venkatesh S (2018), <i>"Graph Memory Networks for Molecular Activity Prediction"</i>, In International Conference on Pattern Recognition (ICPR). ((To Appear. Accepted on 21 Apr 2018))
+	<p class="infolinks"> [<a href="javascript:toggleInfo('trang2018ICPR','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_trang2018ICPR" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{trang2018ICPR,
+  author = {Pham, Trang and Tran, Truyen and Venkatesh, Svetha},
+  title = {Graph Memory Networks for Molecular Activity Prediction},
+  booktitle = {International Conference on Pattern Recognition (ICPR)},
+  year = {2018},
+  number = {(To Appear. Accepted on 21 Apr 2018)}
+}
+</pre></td>
+</tr>
+<tr id="vahid2018CAMS" class="entry">
+	<td>Vahid A, Rana S, Gupta S, Vellanki P, Venkatesh S and Dorin T (2018), <i>"New Bayesian Optimized High Strength Aluminium Alloy Developed From Recycled 7xxx-Series Material"</i>, In International Conference Advancing Materials And Manufacturing. 
+	<p class="infolinks"> [<a href="javascript:toggleInfo('vahid2018CAMS','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_vahid2018CAMS" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{vahid2018CAMS,
+  author = {Vahid, Alireza and Rana, Santu and Gupta, Sunil and Vellanki, Pratibha and Venkatesh, Svetha and Dorin, Thomas},
+  title = {New Bayesian Optimized High Strength Aluminium Alloy Developed From Recycled 7xxx-Series Material},
+  booktitle = {International Conference Advancing Materials And Manufacturing},
+  year = {2018}
+}
+</pre></td>
+</tr>
+<tr id="vahid2018ICAA" class="entry">
+	<td>Vahid A, Rana S, Gupta S, Vellanki P, Venkatesh S and Dorin T (2018), <i>"Development of new high performance 7xxx-series aerospace alloy using Bayesian optimisation"</i>, In International Conference on Aluminum Alloys. 
+	<p class="infolinks"> [<a href="javascript:toggleInfo('vahid2018ICAA','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_vahid2018ICAA" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{vahid2018ICAA,
+  author = {Vahid, Alireza and Rana, Santu and Gupta, Sunil and Vellanki, Pratibha and Venkatesh, Svetha and Dorin, Thomas},
+  title = {Development of new high performance 7xxx-series aerospace alloy using Bayesian optimisation},
+  booktitle = {International Conference on Aluminum Alloys},
+  year = {2018}
+}
+</pre></td>
+</tr>
+<tr id="vahid2018ICYRAM" class="entry">
+	<td>Vahid A, Rana S, Gupta S, Vellanki P, Venkatesh S and Dorin T (2018), <i>"Development of new high strength 7xxx-series alloy from recycled aluminium using Bayesian optimisation"</i>, In International Conference For Young Researchers On Advanced Materials. 
+	<p class="infolinks"> [<a href="javascript:toggleInfo('vahid2018ICYRAM','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_vahid2018ICYRAM" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@inproceedings{vahid2018ICYRAM,
+  author = {Vahid, Alireza and Rana, Santu and Gupta, Sunil and Vellanki, Pratibha and Venkatesh, Svetha and Dorin, Thomas},
+  title = {Development of new high strength 7xxx-series alloy from recycled aluminium using Bayesian optimisation},
+  booktitle = {International Conference For Young Researchers On Advanced Materials},
+  year = {2018}
+}
+</pre></td>
+</tr>
+<tr id="vahid2018new" class="entry">
+	<td>Vahid A, Rana S, Gupta S, Vellanki P, Venkatesh S and Dorin T (2018), <i>"New Bayesian-Optimization-Based Design of High-Strength 7xxx-Series Alloys from Recycled Aluminum"</i>, JOM.  Vol. 70(11), pp. 2704-2709. Springer.
+	<p class="infolinks"> [<a href="javascript:toggleInfo('vahid2018new','bibtex')">BibTeX</a>]</p>
+	</td>
+</tr>
+<tr id="bib_vahid2018new" class="bibtex noshow">
+<td><b>BibTeX</b>:
+<pre>
+@article{vahid2018new,
+  author = {Vahid, Alireza and Rana, Santu and Gupta, Sunil and Vellanki, Pratibha and Venkatesh, Svetha and Dorin, Thomas},
+  title = {New Bayesian-Optimization-Based Design of High-Strength 7xxx-Series Alloys from Recycled Aluminum},
+  journal = {JOM},
+  publisher = {Springer},
+  year = {2018},
+  volume = {70},
+  number = {11},
+  pages = {2704--2709}
+}
+</pre></td>
+</tr>
+</tbody>
+</table>
+<footer>
+ <small>Created by <a href="http://jabref.sourceforge.net">JabRef</a> on 12/01/2019.</small>
+</footer>
+<!-- file generated by JabRef -->
+</body>
+</html>
